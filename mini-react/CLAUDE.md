@@ -41,7 +41,7 @@
 - 실제 DOM을 바꾸는 함수는 `applyPatches` 하나뿐이다.
 - `diff`와 `applyPatches`는 textarea와 history를 모른다 (Phase 2에서 그대로 재사용).
 
-## Phase 1 설계 (❔ 팀 합의 대기)
+## Phase 1 설계 (개인 플레이로 확정)
 - 페이지: [실제 영역] [테스트 영역 = HTML 코드를 고치는 textarea] [←] [Patch] [→]
 - 함수:
   - `htmlToDom(글자)→DOM` · `domToVNode(DOM)→VNode` · `createDom(VNode)→DOM` · `vnodeToHtml(VNode)→글자`
@@ -51,6 +51,8 @@
   - 로드: 실제 영역 → V0 → textarea. history = [V0], index = 0.
   - Patch: textarea → DOM → Vnew. diff(history[index], Vnew) → applyPatches. index 뒤 기록을 버리고 Vnew를 추가, index + 1.
   - ← / →: 지금 VDOM → index ∓ 1 → 목표 VDOM. diff(지금, 목표) → applyPatches. textarea = 목표 글자.
-- 팀이 아직 정하지 않은 것:
-  - DOM 테스트를 어디서 돌릴지 (기본: 브라우저 `tests/test.html`)
-  - 줄바꿈·공백만 있는 글자를 VNode에 넣을지
+- 개인 결정 (11/7, 개인 플레이로 바뀌어 혼자 정함):
+  - DOM 테스트: 브라우저 `tests/test.html` (Live Server로 연다). Node·jsdom은 쓰지 않는다.
+  - 공백 글자: React JSX와 같은 규칙. **줄바꿈이 든 공백 전용 글자는 버리고**, 한 줄 안의 공백(`" "`)은 남긴다.
+    - 이 규칙은 `domToVNode` 한 곳에만 둔다.
+    - 로드할 때 실제 영역을 `createDom(V0)`로 다시 그린다 (실제 DOM과 VNode의 자식 번호를 맞춰 불변식을 지키려고).
