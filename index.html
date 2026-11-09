@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Vanilla JavaScript로 구현한 Virtual DOM, Diff, Patch와 함수형 Hooks 실습">
+  <title>미니 React 실습</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./src/main.js"></script>
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">&lt;/&gt;</span> Week 11–12</a>
+    <nav aria-label="실습 단계"><a href="#phase-1">Phase 1</a><a href="#phase-2">Phase 2</a></nav>
+  </header>
+
+  <main id="top" class="wrap">
+    <section class="intro" aria-labelledby="title">
+      <p class="eyebrow">JUNGLE FRONTEND LAB</p>
+      <h1 id="title">미니 React 실습</h1>
+      <p>HTML을 편집해 바뀐 DOM을 관찰하고, 같은 Diff·Patch로 좋아요와 댓글 화면을 갱신해 보세요.</p>
+    </section>
+
+    <section id="phase-1" class="phase" aria-labelledby="lab-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">PHASE 01</p><h2 id="lab-title">Virtual DOM 실험실</h2></div>
+        <span class="chip">변환 → Diff → Patch</span>
+      </div>
+      <div class="lab-grid">
+        <article class="panel">
+          <header class="panel-head"><h3>실제 영역</h3><span class="chip">적용된 결과</span></header>
+          <div id="actual" class="sample-frame" inert>
+            <div class="sample-content"><h3>이번 주 학습</h3>
+<p class="sample-note">Virtual DOM을 실험해 보세요.</p>
+<ul><li>React</li><li>Redis</li></ul></div>
+          </div>
+          <div class="history-controls">
+            <button id="history-back" type="button" class="button" disabled>← 뒤로가기</button>
+            <span id="history-position" aria-live="polite">1 / 1</span>
+            <button id="history-forward" type="button" class="button" disabled>앞으로가기 →</button>
+          </div>
+        </article>
+        <article class="panel">
+          <header class="panel-head"><h3>테스트 영역</h3><span class="chip">HTML 미리보기</span></header>
+          <div id="preview" class="sample-frame" inert></div>
+          <label for="markup">샘플 HTML 수정</label>
+          <textarea id="markup" rows="6" spellcheck="false" aria-describedby="markup-help"></textarea>
+          <p id="markup-help" class="helper">제목이나 목록을 고쳐보세요. 미리보기에서는 실행 코드가 제외됩니다.</p>
+          <button id="apply-patch" type="button" class="button primary">Patch 적용</button>
+        </article>
+      </div>
+      <output id="patch-summary" class="patch-summary" aria-live="polite">테스트 영역을 편집한 뒤 Patch를 적용해 보세요.</output>
+    </section>
+
+    <section id="phase-2" class="phase" aria-labelledby="board-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">PHASE 02</p><h2 id="board-title">좋아요와 댓글</h2></div>
+        <span class="chip">상태 → 렌더링 → Patch</span>
+      </div>
+      <div class="board-grid">
+        <div id="board" class="panel"></div>
+        <aside class="panel hook-guide" aria-label="시연에 사용한 Hooks">
+          <h3>어디에 쓰였나요?</h3>
+          <dl>
+            <dt>useState</dt><dd>루트에서 좋아요 수와 댓글 초안을 기억합니다.</dd>
+            <dt>useEffect</dt><dd>좋아요 수가 바뀌면 브라우저 탭 제목을 맞춥니다.</dd>
+            <dt>useMemo</dt><dd>댓글 목록이 바뀔 때 댓글 수와 글자 수를 다시 계산합니다.</dd>
+          </dl>
+        </aside>
+      </div>
+    </section>
+  </main>
+  <footer class="wrap footer">Week 11–12 · 미니 React</footer>
+</body>
+</html>
