@@ -47,6 +47,32 @@ function domToVNode(node) {
   return { type: node.tagName.toLowerCase(), props, children };
 }
 
+// ─────────────────────────────────────────────
+// createDom(VNode) → DOM   (domToVNode의 반대 방향)
+//   글자 → 글자 노드 / 상자 → 태그를 만들고, 속성을 붙이고, 자식을 재귀로 만들어 붙인다
+// ─────────────────────────────────────────────
+function createDom(vnode) {
+  // 글자 → 글자 노드
+  if (typeof vnode === "string") {
+    return document.createTextNode(vnode);
+  }
+
+  // 상자 → 태그
+  const el = document.createElement(vnode.type);
+
+  // 속성 붙이기  { class: "a" } → class="a"
+  for (const name in vnode.props) {
+    el.setAttribute(name, vnode.props[name]);
+  }
+
+  // 자식 붙이기. 자식 상자는 같은 함수로 다시 만든다 (재귀)
+  for (const child of vnode.children) {
+    el.appendChild(createDom(child));
+  }
+
+  return el;
+}
+
 // 공백만 있고, 줄바꿈이 들어 있으면 true
 function isIndentOnly(text) {
   return /^\s*$/.test(text) && text.includes("\n");

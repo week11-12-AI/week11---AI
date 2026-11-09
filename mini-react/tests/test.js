@@ -74,6 +74,21 @@ check(
   ] }
 );
 
+// ── createDom ────────────────────────────────
+// 11/9 진훈 예측: 왕복(VNode → DOM → VNode)하면 똑같이 돌아온다 → 맞음
+const roundTripStart = domToVNode(htmlToDom('<p class="a">안녕 <b>철수</b></p>'));
+check(
+  "createDom: 왕복하면 같은 VNode",
+  domToVNode(createDom(roundTripStart)),
+  roundTripStart
+);
+
+check(
+  "createDom: 만든 DOM의 HTML 모양",
+  createDom(roundTripStart).outerHTML,
+  '<p class="a">안녕 <b>철수</b></p>'
+);
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.
