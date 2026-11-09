@@ -3,18 +3,44 @@
 <head>
   <meta charset="utf-8">
   <title>mini-react — Phase 1</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; }
+    .row { display: flex; gap: 16px; flex-wrap: wrap; }
+    .box { flex: 1; min-width: 280px; }
+    #real { border: 2px solid #4a7; padding: 8px; min-height: 120px; }
+    #test-area { width: 100%; height: 120px; font-family: monospace; box-sizing: border-box; }
+    #log { background: #f4f4f4; padding: 8px; white-space: pre-wrap; }
+    button { font-size: 16px; padding: 4px 12px; }
+  </style>
 </head>
 <body>
-  <!-- 실제 영역: applyPatches만 이 안의 DOM을 바꾼다 -->
-  <section id="real"></section>
+  <div class="row">
+    <div class="box">
+      <h3>화면</h3>
+      <!-- applyPatches만 이 안의 DOM을 바꾼다 -->
+      <section id="real">
+        <ul>
+          <li>사과</li>
+          <li>바나나</li>
+        </ul>
+      </section>
+    </div>
 
-  <!-- 테스트 영역: HTML 코드를 고치는 textarea -->
-  <textarea id="test-area"></textarea>
+    <div class="box">
+      <h3>HTML 편집기 (고치고 Patch를 눌러 보세요)</h3>
+      <textarea id="test-area"></textarea>
+      <p>
+        <button id="back">←</button>
+        <button id="patch">Patch</button>
+        <button id="forward">→</button>
+      </p>
+    </div>
+  </div>
 
-  <button id="back">←</button>
-  <button id="patch">Patch</button>
-  <button id="forward">→</button>
+  <h3>마지막 지시서 (diff 결과)</h3>
+  <pre id="log">아직 없음</pre>
 
-  <script src="src/main.js"></script>
+  <script src="src/main.js"></script>   <!-- 블록들 -->
+  <script src="src/app.js"></script>    <!-- 블록을 버튼에 연결 -->
 </body>
 </html>

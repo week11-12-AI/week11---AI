@@ -13,7 +13,7 @@
 | 5 | `diff` | ✅ 6개 (4개 깨짐 → path 규칙) | ✅ | ✅ 8/8 (기대값 전부 내 판정) | ✅ 131줄 재귀 설명 |
 | 6 | `applyPatches` | ✅ 2개 (바뀐 곳만 / 고친 뒤 = 새 VNode) | ✅ | ✅ 11/11 | ✅ findNode 반복 0번 설명 (PROPS는 한 줄 요약만) |
 | 7 | history | ✅ 2개 (옛 미래 버림 / 처음에서 ← 그대로) | ✅ | ✅ 2/2 | ✅ commit의 `length = index + 1` |
-| 8 | 페이지 버튼 연결 | — | ⬜ | ⬜ | — |
+| 8 | 페이지 버튼 연결 | ✅ ← 하면 편집기도 되돌림 | ✅ `app.js` | ✅ 브라우저에서 직접 | — |
 
 **Phase 1 검증** ([slack-phase1-design-verify.md](slack-phase1-design-verify.md))
 - [x] 단위: domToVNode (✅ 글자 / ✅ 속성 / ✅ 중첩 / ✅ 속성 없음 → `props: {}` / ✅ 들여쓰기 공백 버림 / ✅ 한 줄 공백 유지)
@@ -21,7 +21,7 @@
 - [x] 단위: applyPatches (op 5개 + 속성 삭제 + 여러 개 REMOVE + 루트 REPLACE + 글자↔태그 + 안 바뀐 노드 유지)
 - [ ] 단위: history (Patch / ← / → / 되돌린 뒤 Patch)
 - [ ] ⭐ 불변식: patch 후 `domToVNode(실제 영역)` == 새 VNode
-- [ ] 기능: CREATE · REMOVE · REPLACE · PROPS · TEXT · ←/→ 왕복 (Paint flashing으로 바뀐 곳만 확인)
+- [x] 기능: ✅ CREATE · ✅ REMOVE · ✅ REPLACE · ✅ PROPS · ✅ TEXT · ✅ ←/→ 왕복 (✅ Paint flashing: 바나나→딸기 때 화면 상자 안 한 줄만 번쩍임, 11/9)
 - [ ] 엣지: 빈 textarea / 안 닫힌 태그 / 공백 글자 / 속성 삭제 / 여러 자식 동시 삭제 / 글자↔태그 / 처음에서 ← / 끝에서 →
 
 ## Phase 2 — 함수형 컴포넌트 + Hooks

@@ -51,7 +51,13 @@
   - Paint flashing: 바나나→딸기 Patch 때 화면 상자 안에서 **한 줄만** 번쩍임 → (나) "바뀐 곳만 고친다"를 눈으로 확인. 발표 시연용.
 - 지인 대화: "AI 코드를 보고 이해 못 하면 실력 없음" vs "주 1회 손코딩". 가설 5 후보 (백지에서 5줄 함수 써 보기) — 미정.
 
+- 화면 검증 완료: CREATE / REMOVE / REPLACE / PROPS / ← 끝까지 → 처음 화면. **Phase 1 검증 끝.**
+- 발표 형식 확인: 11/12 13:00, **README.md가 발표 자료** (슬라이드 없음), 4분 + 질문 1분, 팀 대표 1명. 목표: 대본 없이 README 그림을 보며 말하기.
+- PC가 느려서 정리: WSL 끔 (VSCode 설정 `dev.containers.executeInWSL: false` — 처음에 "컨테이너로 들어가려는" 원인), Claude 데스크톱 앱·Edge 끔, VSCode 확장 27 → 7개. 대화가 길어서 새 대화로 넘어감 (11/9 저녁).
+
 ## 다음
-0. **백지에 전체 그림 그리기** (기억만으로): 편집기 글자 → htmlToDom → DOM → domToVNode → 새 VNode / history의 이전 VNode → diff → 지시서 → applyPatches → 화면. 막히는 화살표 = 모르는 곳.
-1. 기능 확인 나머지 (CREATE / REMOVE / REPLACE / PROPS를 화면에서 한 번씩) + 엣지 몇 개
-2. Phase 2 설계 (useState 중심)
+- **11/9 저녁 (새 대화 시작):** 커밋 안 된 페이지 작업부터 커밋 (`index.html`, `src/app.js`, `CLAUDE.md`, `checklist.md`, `progress.md`) → Phase 2.
+  - Phase 2 첫 질문 (답하기 전에 끊김): 카운터 `div [ p ["0"], button ["+1"] ]`에서 +1을 누르면 → 새 VNode `div [ p ["1"], button ["+1"] ]`. 숫자를 바꾸는 지시서는? (정답 후보 `{op:"TEXT", path:[0,0], value:"1"}`, 사용자가 먼저 예측)
+  - Phase 2 그림: "상태가 바뀐다 → 함수(컴포넌트)가 VNode를 다시 만든다 → diff → applyPatches (Phase 1 블록 재사용)"
+- **11/10 (화) 10시 출근하면 Claude가 먼저 묻는다 (사용자 요청):** 백지에 전체 그림 그리기 (기억만으로): 편집기 글자 → htmlToDom → 임시 DOM → domToVNode → 새 VNode / history의 지금 VNode → diff → 지시서 → applyPatches → 화면 DOM → commit → 브라우저가 바뀐 곳만 다시 그림. 막히는 화살표 = 모르는 곳.
+- 11/10: useEffect / useMemo (되는 만큼) → README 초안. 11/11: 팀 선정 → README 다듬기 → 4분 리허설.

@@ -46,6 +46,7 @@
 
 ## Phase 1 설계 (개인 플레이로 확정)
 - 페이지: [실제 영역] [테스트 영역 = HTML 코드를 고치는 textarea] [←] [Patch] [→]
+  - 화면에 보이는 이름 (11/9 사용자 결정, 모호해서 바꿈): 실제 영역 → **화면**, 테스트 영역 → **HTML 편집기**. 코드의 id(`real`, `test-area`)는 그대로.
 - 함수:
   - `htmlToDom(글자)→DOM` · `domToVNode(DOM)→VNode` · `createDom(VNode)→DOM` · `vnodeToHtml(VNode)→글자`
   - `diff(이전, 새)→patch[]` · `applyPatches(실제영역, patch[])`
