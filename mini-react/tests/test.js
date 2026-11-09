@@ -21,25 +21,35 @@ function check(name, actual, expected) {
   console.log(line.textContent);
 }
 
-// 테스트용 DOM 만들기 (htmlToDom을 구현하기 전까지 쓰는 임시 도구)
-function makeDom(html) {
-  const t = document.createElement("template");
-  t.innerHTML = html.trim();
-  return t.content.firstChild;
-}
+// (임시 도구 makeDom은 main.js의 htmlToDom으로 옮겼다)
+
+// ── htmlToDom ────────────────────────────────
+// DOM은 그대로 찍어 볼 수 없으니 domToVNode로 바꿔서 비교한다
+check(
+  "htmlToDom: 정상 HTML",
+  domToVNode(htmlToDom('<p class="a">안녕</p>')),
+  { type: "p", props: { class: "a" }, children: ["안녕"] }
+);
+
+// 11/9 진훈 예측: (가) 에러로 멈춘다 → 깨짐. 브라우저가 빠진 </p>를 채워 넣는다
+check(
+  "htmlToDom: 안 닫힌 태그도 고쳐서 읽음",
+  domToVNode(htmlToDom("<p>안녕")),
+  { type: "p", props: {}, children: ["안녕"] }
+);
 
 // ── domToVNode ───────────────────────────────
 // 11/9 진훈 예측
 check(
   "domToVNode: 글자 + 속성",
-  domToVNode(makeDom('<p class="a">안녕</p>')),
+  domToVNode(htmlToDom('<p class="a">안녕</p>')),
   { type: "p", props: { class: "a" }, children: ["안녕"] }
 );
 
 // 11/9 진훈 예측: children: ["p", "안녕"] → 깨짐. 자식 태그는 통째로 VNode가 된다 (재귀)
 check(
   "domToVNode: 태그 안의 태그 (재귀)",
-  domToVNode(makeDom("<div><p>안녕</p></div>")),
+  domToVNode(htmlToDom("<div><p>안녕</p></div>")),
   { type: "div", props: {}, children: [
     { type: "p", props: {}, children: ["안녕"] }
   ] }
@@ -48,7 +58,7 @@ check(
 // 11/9 진훈 예측: children 1개 → 맞음. 줄바꿈이 든 공백(들여쓰기) 2개는 버린다
 check(
   "domToVNode: 들여쓰기 공백은 버림",
-  domToVNode(makeDom("<div>\n  <p>안녕</p>\n</div>")),
+  domToVNode(htmlToDom("<div>\n  <p>안녕</p>\n</div>")),
   { type: "div", props: {}, children: [
     { type: "p", props: {}, children: ["안녕"] }
   ] }
@@ -57,7 +67,7 @@ check(
 // 11/9 진훈 예측: ["안녕 ", [ {b} ]] → 공백 유지는 맞음, b를 [ ]로 한 번 더 감싼 곳이 깨짐
 check(
   "domToVNode: 한 줄 안의 공백은 남김",
-  domToVNode(makeDom("<p>안녕 <b>철수</b></p>")),
+  domToVNode(htmlToDom("<p>안녕 <b>철수</b></p>")),
   { type: "p", props: {}, children: [
     "안녕 ",
     { type: "b", props: {}, children: ["철수"] }
@@ -84,7 +94,7 @@ function traceDomToVNode(html) {
   };
 
   try {
-    domToVNode(makeDom(html));
+    domToVNode(htmlToDom(html));
   } finally {
     domToVNode = original; // 원래 함수로 되돌림
   }

@@ -2,6 +2,18 @@
 // 함수 하나씩: 예측 → 구현 → 실행 비교 → 커밋
 
 // ─────────────────────────────────────────────
+// htmlToDom(글자) → DOM
+//   글자를 브라우저에게 읽혀서 DOM 노드로 만든다. 맨 바깥 요소 1개를 돌려준다.
+//   브라우저 HTML 읽기는 너그럽다: 틀린 HTML도 에러 없이 고쳐서 읽는다.
+// ─────────────────────────────────────────────
+function htmlToDom(html) {
+  // <template>: 화면에 그리지 않고 HTML을 읽기만 하는 상자
+  const box = document.createElement("template");
+  box.innerHTML = html.trim(); // 앞뒤 공백을 빼야 첫 자식이 요소가 된다
+  return box.content.firstChild;
+}
+
+// ─────────────────────────────────────────────
 // domToVNode(DOM) → VNode
 //   VNode 약속: { type, props, children }
 //   - 글자 자식은 항상 문자열
