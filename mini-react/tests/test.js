@@ -193,6 +193,28 @@ for (const [name, oldV, newV] of applyCases) {
     area.firstChild.childNodes[0] === appleBefore, true);
 }
 
+// ── history ──────────────────────────────────
+// VNode 대신 글자 "A", "B"…로 대신한다 (history는 내용을 들여다보지 않음)
+
+// 11/9 진훈 예측 (나): 과거로 간 뒤 Patch하면 옛 미래는 버려진다
+{
+  const h = createHistory("A");
+  commit(h, "B");
+  commit(h, "C");
+  back(h);          // B를 보는 중
+  commit(h, "D");
+  check("history: ← 뒤에 Patch하면 옛 미래(C)는 버림", h, { list: ["A", "B", "D"], index: 2 });
+}
+
+// 11/9 진훈 예측 (나): 맨 처음에서 ←를 눌러도 index 0 그대로
+{
+  const h = createHistory("A");
+  commit(h, "B");
+  back(h);
+  back(h);          // 이미 맨 처음인데 한 번 더
+  check("history: 처음에서 ← 는 그대로", h.index, 0);
+}
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.

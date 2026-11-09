@@ -12,7 +12,7 @@
 | 4 | `vnodeToHtml` | ✅ 1개 (맞음: 한 줄) | ✅ | ✅ 2/2 | — |
 | 5 | `diff` | ✅ 6개 (4개 깨짐 → path 규칙) | ✅ | ✅ 8/8 (기대값 전부 내 판정) | ✅ 131줄 재귀 설명 |
 | 6 | `applyPatches` | ✅ 2개 (바뀐 곳만 / 고친 뒤 = 새 VNode) | ✅ | ✅ 11/11 | ✅ findNode 반복 0번 설명 (PROPS는 한 줄 요약만) |
-| 7 | history | ⬜ | ⬜ | ⬜ | ⬜ 핵심 |
+| 7 | history | ✅ 2개 (옛 미래 버림 / 처음에서 ← 그대로) | ✅ | ✅ 2/2 | ✅ commit의 `length = index + 1` |
 | 8 | 페이지 버튼 연결 | — | ⬜ | ⬜ | — |
 
 **Phase 1 검증** ([slack-phase1-design-verify.md](slack-phase1-design-verify.md))

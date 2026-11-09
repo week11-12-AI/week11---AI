@@ -40,6 +40,10 @@
   - CREATE 규칙: **path의 마지막 숫자를 가린다 → 남은 것 = 부모, 가린 숫자 = 자리**. 순서를 뒤집거나 자리를 0으로 착각해서 두 번 깨짐.
   - `path[path.length - 1]`이 읽기 싫다 → `path.at(-1)`로 바꿈. `slice`는 "마지막 하나 빼기"로만 기억.
 
+- `applyPatches` 커밋 + push (`30e3fe5`).
+- `history` 예측 2개 맞힘 (← 뒤 Patch하면 옛 미래 버림 / 처음에서 ← 그대로) → 구현 + 테스트 (통과 31).
+  - 줄 설명 통과: `h.list.length = h.index + 1` — 번호는 0부터라 지금 칸까지 남기려면 개수는 index + 1.
+  - "서로 모른다" = history, diff, applyPatches가 독립된 레고 블록. 이어 붙이는 건 페이지 코드.
+
 ## 다음
-1. history 예측 → 구현 → 비교
-2. 페이지 연결 (textarea + Patch / ← / →) → Phase 1 완성
+1. 페이지 연결 (textarea + Patch / ← / →) → Phase 1 완성

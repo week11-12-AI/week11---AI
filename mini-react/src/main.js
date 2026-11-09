@@ -193,6 +193,39 @@ function findNode(area, path) {
   return node;
 }
 
+// ─────────────────────────────────────────────
+// history   ⭐ 핵심
+//   화면 VNode를 순서대로 저장하고, index로 지금 보는 칸을 가리킨다.
+//   diff / applyPatches와 서로 모른다 (불변식).
+// ─────────────────────────────────────────────
+function createHistory(first) {
+  return { list: [first], index: 0 };
+}
+
+// 지금 보는 VNode
+function current(h) {
+  return h.list[h.index];
+}
+
+// Patch: 지금 칸 뒤의 미래를 버리고, 새 VNode를 추가하고, 그 칸으로 이동
+function commit(h, vnode) {
+  h.list.length = h.index + 1; // 목록 길이를 지금 칸까지로 줄임 = 뒤를 잘라 버림
+  h.list.push(vnode);
+  h.index = h.index + 1;
+}
+
+// ← : 한 칸 과거로 (처음이면 그대로)
+function back(h) {
+  if (h.index > 0) h.index = h.index - 1;
+  return current(h);
+}
+
+// → : 한 칸 미래로 (끝이면 그대로)
+function forward(h) {
+  if (h.index < h.list.length - 1) h.index = h.index + 1;
+  return current(h);
+}
+
 // 속성 이름과 값이 모두 같으면 true (적힌 순서는 상관없음)
 function sameProps(a, b) {
   const aNames = Object.keys(a);
