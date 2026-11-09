@@ -89,6 +89,22 @@ check(
   '<p class="a">안녕 <b>철수</b></p>'
 );
 
+// ── vnodeToHtml ──────────────────────────────
+// 11/9 진훈 예측: (가) 한 줄 → 맞음. VNode에 들여쓰기 정보가 없다
+check(
+  "vnodeToHtml: 한 줄 글자",
+  vnodeToHtml({ type: "div", props: {}, children: [
+    { type: "p", props: {}, children: ["안녕"] }
+  ] }),
+  "<div><p>안녕</p></div>"
+);
+
+check(
+  "vnodeToHtml: 글자로 갔다가 돌아와도 같은 VNode",
+  domToVNode(htmlToDom(vnodeToHtml(roundTripStart))),
+  roundTripStart
+);
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.

@@ -73,6 +73,36 @@ function createDom(vnode) {
   return el;
 }
 
+// ─────────────────────────────────────────────
+// vnodeToHtml(VNode) → 글자   (← / → 때 textarea를 채운다)
+//   VNode에는 들여쓰기 정보가 없으므로 한 줄로 만든다
+// ─────────────────────────────────────────────
+function vnodeToHtml(vnode) {
+  // 글자 → 그대로 (단, < > & 는 태그로 오해받지 않게 바꿔 적는다)
+  if (typeof vnode === "string") {
+    return escapeHtml(vnode);
+  }
+
+  // 속성 → ' class="a"' 처럼 앞에 공백을 붙여 이어 쓴다
+  let attrs = "";
+  for (const name in vnode.props) {
+    attrs += ` ${name}="${escapeHtml(vnode.props[name])}"`;
+  }
+
+  // 자식 → 각각 글자로 바꿔 이어 붙인다 (재귀)
+  const inner = vnode.children.map(vnodeToHtml).join("");
+
+  return `<${vnode.type}${attrs}>${inner}</${vnode.type}>`;
+}
+
+function escapeHtml(text) {
+  return text
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
 // 공백만 있고, 줄바꿈이 들어 있으면 true
 function isIndentOnly(text) {
   return /^\s*$/.test(text) && text.includes("\n");

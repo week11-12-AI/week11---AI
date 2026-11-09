@@ -21,6 +21,8 @@
 - 재귀 호출 순서를 console.log 들여쓰기로 봤다 (test.js 아래쪽). 형제 순서 예측은 맞았다.
 - PowerShell 프로필에 UTF-8 출력 설정 (터미널 한글 깨짐 해결).
 
+- 변환 함수 3개 완료: `htmlToDom` (예측 깨짐: 틀린 HTML도 에러 없이 고쳐 읽음) / `createDom` (왕복 일대일, 맞음) / `vnodeToHtml` (한 줄, 맞음).
+
 ## 다음
-1. `htmlToDom` 예측 → 구현 → 비교
-2. `createDom`, `vnodeToHtml` → diff (완료 기준: diff op 5개 통과)
+1. `diff` 예측 → 구현 → 비교 (완료 기준: op 5개 + 안 바뀌면 `[]` + 깊은 path)
+2. ⚠️ diff 시작할 때 Claude가 다시 설명하기로 한 것: "들여쓰기 때문에 DOM↔VNode 일대일이 깨지는 곳 → 로드할 때 실제 영역을 `createDom(V0)`로 다시 그리는 이유". 11/9에 읽고 이해 못 함.
