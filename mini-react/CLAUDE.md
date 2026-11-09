@@ -2,6 +2,7 @@
 
 ## 세션 시작 규칙
 - `docs/progress.md`를 먼저 읽고 지난번 위치를 한 줄로 확인한 뒤 시작한다.
+- 요구사항 기준: `docs/assignment.md` (과제 원문). 새 Phase나 설계를 시작하기 전에 원문과 맞는지 먼저 본다.
 - 지금 어디인지: `docs/checklist.md`. 함수가 끝날 때마다 표를 갱신한다.
 - AI 기록과 노하우 가설: `docs/ai-log.md`. 규칙이 아니라 **가설**로 다룬다 (사용자가 판정).
 - 함수 하나당 노트: `docs/templates/cycle-note.md` 양식 (선택).

@@ -55,6 +55,10 @@
 - 발표 형식 확인: 11/12 13:00, **README.md가 발표 자료** (슬라이드 없음), 4분 + 질문 1분, 팀 대표 1명. 목표: 대본 없이 README 그림을 보며 말하기.
 - PC가 느려서 정리: WSL 끔 (VSCode 설정 `dev.containers.executeInWSL: false` — 처음에 "컨테이너로 들어가려는" 원인), Claude 데스크톱 앱·Edge 끔, VSCode 확장 27 → 7개. 대화가 길어서 새 대화로 넘어감 (11/9 저녁).
 
+- (새 대화) 과제 원문을 받아 `docs/assignment.md`에 저장. Phase 1은 원문과 맞음. Phase 2 틀: `FunctionComponent` 클래스(hooks/mount/update), 상태·Hook은 루트에만, 자식은 props만.
+- 팀: 수요일쯤 논의 전까지 **개인 플레이**로 진도. 2주에 과제 3개 (리액트 → 레디스 → DBMS). 기준은 내 학습과 성장.
+- Phase 2 예측 2개 맞힘: +1 → 글자 하나만 고침 (TEXT `[0,0]`) / 변수만 바꾸면 화면은 그대로 → 누군가 다시 그려야 함 (= setState의 일).
+
 ## 다음
 - **11/9 저녁 (새 대화 시작):** 커밋 안 된 페이지 작업부터 커밋 (`index.html`, `src/app.js`, `CLAUDE.md`, `checklist.md`, `progress.md`) → Phase 2.
   - Phase 2 첫 질문 (답하기 전에 끊김): 카운터 `div [ p ["0"], button ["+1"] ]`에서 +1을 누르면 → 새 VNode `div [ p ["1"], button ["+1"] ]`. 숫자를 바꾸는 지시서는? (정답 후보 `{op:"TEXT", path:[0,0], value:"1"}`, 사용자가 먼저 예측)
