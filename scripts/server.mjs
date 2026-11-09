@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
@@ -7,6 +8,7 @@ const root = new URL("../", import.meta.url);
 const types = { html: "text/html", css: "text/css", js: "text/javascript" };
 
 export async function startServer(port = 4173) {
+  const runId = randomUUID();
   const server = createServer(async (request, response) => {
     const requested = new URL(request.url, "http://127.0.0.1").pathname;
     const path = requested === "/" ? "/index.html" : requested;
@@ -20,7 +22,8 @@ export async function startServer(port = 4173) {
     }
 
     try {
-      const file = await readFile(new URL(path.slice(1), root));
+      let file = await readFile(new URL(path.slice(1), root));
+      if (path === "/index.html") file = file.toString("utf8").replace("__SERVER_RUN_ID__", runId);
       const type = types[path.split(".").at(-1)];
       response.writeHead(200, { "Content-Type": type + "; charset=utf-8", "Cache-Control": "no-store" });
       response.end(file);

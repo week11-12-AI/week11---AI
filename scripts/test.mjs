@@ -20,9 +20,8 @@ if (!browser) throw new Error("Chrome or Edge was not found. Set BROWSER_PATH to
 const temp = await realpath(tmpdir());
 const profile = await mkdtemp(join(temp, "mini-react-test-"));
 let server;
-try {
-  server = await startServer(0);
-  const url = `http://127.0.0.1:${server.address().port}/tests/browser.html`;
+
+async function runBrowserTests(url) {
   const { stdout } = await execute(browser, [
     "--headless", "--disable-gpu", "--disable-extensions", "--no-first-run", "--no-default-browser-check",
     "--disable-background-networking", "--disable-component-update", "--no-proxy-server",
@@ -33,7 +32,19 @@ try {
   if (!stdout.includes('data-tests="passed"') || lines.length === 0) {
     throw new Error("Browser tests did not pass. Open /tests/browser.html to inspect the results.");
   }
-  console.log(`\n${lines.length} browser tests passed.`);
+  return lines.length;
+}
+
+try {
+  server = await startServer(0);
+  const port = server.address().port;
+  const testPage = `http://127.0.0.1:${port}/tests/browser.html`;
+  let passed = await runBrowserTests(`${testPage}?lifecycle=prepare`);
+  await new Promise(done => server.close(done));
+  server = undefined;
+  server = await startServer(port);
+  passed += await runBrowserTests(`${testPage}?lifecycle=restart`);
+  console.log(`\n${passed} browser tests passed.`);
 } finally {
   if (server) await new Promise(done => server.close(done));
   const resolved = await realpath(profile);

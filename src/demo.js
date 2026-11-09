@@ -26,11 +26,21 @@ function CommentList({ comments, summary }) {
   );
 }
 
-function Board() {
-  const [likes, setLikes] = useState(9);
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [comments, setComments] = useState([]);
+function Board({ storage }) {
+  const [likes, setLikes] = useState(() => {
+    const saved = storage?.read("likes");
+    return Number.isSafeInteger(saved) && saved >= 0 ? saved : 0;
+  });
+  const [discussion, setDiscussion] = useState(() => {
+    const saved = storage?.read("comments");
+    return {
+      open: saved?.open === true,
+      draft: typeof saved?.draft === "string" ? saved.draft : "",
+      comments: Array.isArray(saved?.comments) && saved.comments.every(item => typeof item === "string")
+        ? saved.comments : [],
+    };
+  });
+  const { open, draft, comments } = discussion;
 
   const summary = useMemo(() => ({
     count: comments.length,
@@ -39,23 +49,27 @@ function Board() {
 
   const actions = useMemo(() => ({
     like: () => setLikes(value => value + 1),
-    toggle: () => setOpen(value => !value),
-    edit: event => setDraft(event.currentTarget.value),
-  }), [setLikes, setOpen, setDraft]);
+    toggle: () => setDiscussion(state => ({ ...state, open: !state.open })),
+    edit: event => setDiscussion(state => ({ ...state, draft: event.currentTarget.value })),
+  }), [setLikes, setDiscussion]);
 
   function submit(event) {
     event.preventDefault();
     const comment = draft.trim();
     if (!comment) return;
-    setComments(items => [...items, comment]);
-    setDraft("");
+    setDiscussion(state => ({ ...state, comments: [...state.comments, comment], draft: "" }));
   }
 
   useEffect(() => {
     const previousTitle = document.title;
     document.title = `미니 React | 좋아요 ${likes}`;
+    storage?.write("likes", likes);
     return () => { document.title = previousTitle; };
-  }, [likes]);
+  }, [likes, storage]);
+
+  useEffect(() => {
+    storage?.write("comments", discussion);
+  }, [discussion, storage]);
 
   return h("article", { class: "post" },
     h("p", { class: "eyebrow" }, "MINI BOARD / 01"),
@@ -67,8 +81,8 @@ function Board() {
   );
 }
 
-export function mountBoard(container) {
-  const board = new FunctionComponent(Board, container);
+export function mountBoard(container, storage) {
+  const board = new FunctionComponent(Board, container, { storage });
   board.mount();
   return board;
 }

@@ -1,10 +1,13 @@
 export class StateHistory {
   #entries;
-  #cursor = 0;
+  #cursor;
 
-  constructor(initialTree) {
-    this.#entries = [initialTree];
+  constructor(initialTree, { entries = [initialTree], cursor = 0 } = {}) {
+    this.#entries = [...entries];
+    this.#cursor = cursor;
   }
+
+  snapshot() { return { entries: [...this.#entries], cursor: this.#cursor }; }
 
   get current() { return this.#entries[this.#cursor]; }
   get position() { return this.#cursor; }

@@ -31,14 +31,21 @@ function readDraft(source, doc) {
 
 const patchLabels = { text: "텍스트", props: "속성", insert: "추가", remove: "삭제", replace: "교체" };
 
-export function mountLab({ actual, preview, editor, patchButton, back, forward, position, changes }) {
+export function mountLab({ actual, preview, editor, patchButton, back, forward, position, changes, storage }) {
   const doc = actual.ownerDocument;
   let actualRoot = actual.firstElementChild;
-  const initial = fromDOM(actualRoot);
-  const history = new StateHistory(initial);
-  let previewRoot = toDOM(initial, doc);
+  const initial = { tree: fromDOM(actualRoot), markup: actualRoot.innerHTML };
+  const saved = storage?.read("lab");
+  const valid = Array.isArray(saved?.entries) && saved.entries.every(entry => typeof entry === "string")
+    && Number.isInteger(saved.cursor) && saved.cursor >= 0 && saved.cursor < saved.entries.length;
+  const history = new StateHistory(initial, valid ? {
+    entries: saved.entries.map(markup => ({ tree: readDraft(markup, doc), markup })),
+    cursor: saved.cursor,
+  } : undefined);
+  actualRoot = patch(actualRoot, diff(initial.tree, history.current.tree));
+  editor.value = valid && typeof saved.draft === "string" ? saved.draft : history.current.markup;
+  let previewRoot = toDOM(readDraft(editor.value, doc), doc);
   preview.append(previewRoot);
-  editor.value = actualRoot.innerHTML;
 
   const observer = new MutationObserver(() => {});
   observer.observe(actual, { attributes: true, characterData: true, childList: true, subtree: true });
@@ -63,13 +70,22 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
     previewRoot = patch(previewRoot, diff(fromDOM(previewRoot), next));
   }
 
-  editor.addEventListener("input", updatePreview);
+  function save() {
+    const { entries, cursor } = history.snapshot();
+    storage?.write("lab", { entries: entries.map(entry => entry.markup), cursor, draft: editor.value });
+  }
+
+  editor.addEventListener("input", () => {
+    updatePreview();
+    save();
+  });
   patchButton.addEventListener("click", () => {
     updatePreview();
     const next = fromDOM(previewRoot);
-    const patches = diff(history.current, next);
+    const patches = diff(history.current.tree, next);
     actualRoot = patch(actualRoot, patches);
-    if (patches.length) history.push(next);
+    if (patches.length) history.push({ tree: next, markup: actualRoot.innerHTML });
+    save();
     showChanges(patches);
   });
 
@@ -77,10 +93,11 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
     const previous = history.current;
     const next = history.move(direction);
     if (!next) return;
-    const patches = diff(previous, next);
+    const patches = diff(previous.tree, next.tree);
     actualRoot = patch(actualRoot, patches);
-    previewRoot = patch(previewRoot, diff(fromDOM(previewRoot), next));
-    editor.value = actualRoot.innerHTML;
+    previewRoot = patch(previewRoot, diff(fromDOM(previewRoot), next.tree));
+    editor.value = next.markup;
+    save();
     showChanges(patches);
   }
 

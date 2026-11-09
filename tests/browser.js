@@ -1,6 +1,7 @@
 import { diff, element, fromDOM, patch, toDOM } from "../src/vdom.js";
 import { FunctionComponent, h, useEffect, useMemo, useState } from "../src/component.js";
 import { StateHistory } from "../src/history.js";
+import { storageKey } from "../src/storage.js";
 
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -223,6 +224,14 @@ function input(field, value) {
   field.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
+function reloadDemo(frame) {
+  return new Promise((done, fail) => {
+    const deadline = setTimeout(() => fail(new Error("Demo iframe did not reload")), 5000);
+    frame.addEventListener("load", () => { clearTimeout(deadline); done(); }, { once: true });
+    frame.contentWindow.location.reload();
+  });
+}
+
 test("Phase 1 화면에서 편집, Patch, 히스토리 이동, 빈 영역 복원이 동작한다", async () => {
   const frame = await loadDemo();
   try {
@@ -264,8 +273,8 @@ test("Phase 2에서 좋아요와 댓글이 갱신되고 작성창 밖의 노드�
     const title = $("#post-title");
     const like = $("#like-button");
     const summary = $("#comment-summary");
-    equal(like.textContent, "좋아요 9");
-    like.click();
+    equal(like.textContent, "좋아요 0");
+    for (let count = 0; count < 10; count += 1) like.click();
     equal($("#like-button"), like);
     equal(like.textContent, "좋아요 10");
     assert($("#popular-badge"));
@@ -289,6 +298,77 @@ test("Phase 2에서 좋아요와 댓글이 갱신되고 작성창 밖의 노드�
   } finally { frame.remove(); }
 });
 
+const lifecycle = new URLSearchParams(location.search).get("lifecycle");
+const appKeys = [storageKey("likes"), storageKey("lab"), storageKey("comments")];
+
+test("새로고침은 좋아요, 댓글과 초안, Patch 기록과 HTML 초안을 복원한다", async () => {
+  for (const key of appKeys) localStorage.removeItem(key);
+  const frame = await loadDemo();
+  try {
+    const $ = selector => frame.contentDocument.querySelector(selector);
+    $("#like-button").click();
+    $("#like-button").click();
+    $("#toggle-composer").click();
+    input($("#comment-draft"), "등록한 댓글");
+    $("#comment-form button").click();
+    input($("#comment-draft"), "작성 중인 댓글");
+    const initial = $("#markup").value;
+    input($("#markup"), initial.replace("이번 주 학습", "Patch A"));
+    $("#apply-patch").click();
+    input($("#markup"), initial.replace("이번 주 학습", "Patch B"));
+    $("#apply-patch").click();
+    $("#history-back").click();
+    const draft = initial.replace("이번 주 학습", "미적용 초안");
+    input($("#markup"), draft);
+
+    await reloadDemo(frame);
+    equal($("#like-button").textContent, "좋아요 2");
+    equal($("#comment-list li").textContent, "등록한 댓글");
+    equal($("#comment-draft").value, "작성 중인 댓글");
+    equal($("#actual h3").textContent, "Patch A");
+    equal($("#preview h3").textContent, "미적용 초안");
+    equal($("#markup").value, draft);
+    equal($("#history-position").textContent, "2 / 3");
+    equal($("#history-forward").disabled, false);
+    $("#history-forward").click();
+    equal($("#actual h3").textContent, "Patch B");
+    equal($("#preview h3").textContent, "Patch B");
+  } finally { frame.remove(); }
+});
+
+if (lifecycle === "restart") {
+  tests.length = 0;
+  test("같은 주소에서 서버만 재시작하면 이전 기록을 무시하고 초기 화면으로 돌아간다", async () => {
+    const previousLikes = JSON.parse(localStorage.getItem(storageKey("likes")));
+    const previousLab = JSON.parse(localStorage.getItem(storageKey("lab")));
+    const previousDiscussion = JSON.parse(localStorage.getItem(storageKey("comments")));
+    equal(previousLikes.value, 2);
+    equal(previousLab.value.cursor, 2);
+    equal(previousDiscussion.value.comments[0], "등록한 댓글");
+    equal(previousDiscussion.value.draft, "작성 중인 댓글");
+    const frame = await loadDemo();
+    try {
+      const $ = selector => frame.contentDocument.querySelector(selector);
+      assert($('meta[name="mini-react-run"]').content !== previousLikes.runId, "server run did not change");
+      equal($("#like-button").textContent, "좋아요 0");
+      equal($("#comment-list"), null);
+      equal($("#comment-summary").textContent, "댓글 0개 · 총 0자");
+      equal($("#comment-draft"), null);
+      $("#toggle-composer").click();
+      equal($("#comment-draft").value, "");
+      equal($("#actual h3").textContent, "이번 주 학습");
+      equal($("#preview h3").textContent, "이번 주 학습");
+      assert($("#markup").value.includes("이번 주 학습"));
+      equal($("#history-position").textContent, "1 / 1");
+      equal($("#history-back").disabled, true);
+      equal($("#history-forward").disabled, true);
+    } finally { frame.remove(); }
+  });
+}
+
+// Manual use of the test page leaves the reader's existing demo data intact.
+const backup = lifecycle === null ? appKeys.map(key => [key, localStorage.getItem(key)]) : [];
+if (lifecycle !== "restart") for (const key of appKeys) localStorage.removeItem(key);
 let failures = 0;
 for (const { name, run } of tests) {
   const line = document.createElement("li");
@@ -302,6 +382,10 @@ for (const { name, run } of tests) {
     line.textContent = `FAIL ${name}: ${error.message}`;
   }
   document.querySelector("#results").append(line);
+}
+for (const [key, value] of backup) {
+  if (value === null) localStorage.removeItem(key);
+  else localStorage.setItem(key, value);
 }
 document.documentElement.dataset.tests = failures ? "failed" : "passed";
 document.querySelector("#result").textContent = `${tests.length - failures}/${tests.length} 통과`;
