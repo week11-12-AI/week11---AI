@@ -6,7 +6,7 @@
 ## Phase 1 — Virtual DOM + diff
 | | 함수 | 예측 | 구현 | 테스트 통과 | 설명 |
 |---|---|---|---|---|---|
-| 1 | `domToVNode` | 🔶 진행 중 | ⬜ | ⬜ | ⬜ |
+| 1 | `domToVNode` | ✅ 2개 (1개 깨짐 → 재귀) | ✅ | 🔶 2/2 (공백 규칙 미검증) | ✅ 3덩어리 + 호출 순서 |
 | 2 | `htmlToDom` | ⬜ | ⬜ | ⬜ | — |
 | 3 | `createDom` | ⬜ | ⬜ | ⬜ | — |
 | 4 | `vnodeToHtml` | ⬜ | ⬜ | ⬜ | — |
@@ -16,7 +16,7 @@
 | 8 | 페이지 버튼 연결 | — | ⬜ | ⬜ | — |
 
 **Phase 1 검증** ([slack-phase1-design-verify.md](slack-phase1-design-verify.md))
-- [ ] 단위: domToVNode (글자 / 속성 / 중첩 / 속성 없음 → `props: {}`)
+- [ ] 단위: domToVNode (✅ 글자 / ✅ 속성 / ✅ 중첩 / ✅ 속성 없음 → `props: {}` / ⬜ 공백 규칙)
 - [ ] 단위: diff (op 5개 + 안 바뀌면 `[]` + 깊은 path)
 - [ ] 단위: applyPatches (op 5개)
 - [ ] 단위: history (Patch / ← / → / 되돌린 뒤 Patch)

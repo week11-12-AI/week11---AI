@@ -3,9 +3,18 @@
 <head>
   <meta charset="utf-8">
   <title>mini-react — tests</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; }
+    .pass { color: green; }
+    .fail { color: crimson; }
+    pre { margin: 4px 0; }
+  </style>
 </head>
 <body>
-  <!-- 브라우저에서 열어 테스트를 돌린다 (CLAUDE.md 기본값) -->
+  <!-- 브라우저에서 열어 테스트를 돌린다 (Live Server) -->
+  <h1 id="summary">테스트 실행 중…</h1>
+  <div id="results"></div>
+
   <script src="../src/main.js"></script>
   <script src="test.js"></script>
 </body>
