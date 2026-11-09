@@ -105,6 +105,52 @@ check(
   roundTripStart
 );
 
+// ── diff ─────────────────────────────────────
+// 11/9 진훈 예측 5개 (깨진 곳은 정답으로 고쳐 넣음). 테스트용 짧은 VNode 만들기 도구:
+const v = (type, props, ...children) => ({ type, props, children });
+
+// 예측: path: 2 → 깨짐. path는 목록, "안녕"은 p의 0번 자식
+check("diff TEXT: 글자만 바뀜",
+  diff(v("p", {}, "안녕"), v("p", {}, "하이")),
+  [{ op: "TEXT", path: [0], value: "하이" }]);
+
+// 예측: [0, 1] → 깨짐. path는 바깥(루트)에서 안쪽 순서
+check("diff TEXT: 두 단계 깊이",
+  diff(v("div", {}, v("p", {}, "안녕"), v("b", {}, "철수")),
+       v("div", {}, v("p", {}, "안녕"), v("b", {}, "영희"))),
+  [{ op: "TEXT", path: [1, 0], value: "영희" }]);
+
+// 예측: path [0], props "b" → 깨짐. 루트 자신은 [], 속성은 이름+값
+check("diff PROPS: 루트의 속성이 바뀜",
+  diff(v("p", { class: "a" }, "안녕"), v("p", { class: "b" }, "안녕")),
+  [{ op: "PROPS", path: [], props: { class: "b" } }]);
+
+// 예측: path [0, 1] → 깨짐. 루트는 번호가 없다
+check("diff CREATE: 자식이 늘어남",
+  diff(v("div", {}, v("p", {}, "안녕")),
+       v("div", {}, v("p", {}, "안녕"), v("b", {}, "철수"))),
+  [{ op: "CREATE", path: [1], node: v("b", {}, "철수") }]);
+
+// 예측: path: 1 → 숫자는 맞음, path는 항상 목록
+check("diff REMOVE: 자식이 없어짐",
+  diff(v("div", {}, v("p", {}, "안녕"), v("b", {}, "철수")),
+       v("div", {}, v("p", {}, "안녕"))),
+  [{ op: "REMOVE", path: [1] }]);
+
+// 예측: 맞음
+check("diff REPLACE: 태그 종류가 바뀜",
+  diff(v("div", {}, v("p", {}, "안녕")), v("div", {}, v("span", {}, "안녕"))),
+  [{ op: "REPLACE", path: [0], node: v("span", {}, "안녕") }]);
+
+check("diff: 안 바뀌면 빈 목록",
+  diff(v("p", { class: "a" }, "안녕"), v("p", { class: "a" }, "안녕")),
+  []);
+
+check("diff REMOVE 여러 개: 뒤에서부터",
+  diff(v("div", {}, v("p", {}, "1"), v("b", {}, "2"), v("i", {}, "3")),
+       v("div", {}, v("p", {}, "1"))),
+  [{ op: "REMOVE", path: [2] }, { op: "REMOVE", path: [1] }]);
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.

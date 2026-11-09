@@ -95,6 +95,63 @@ function vnodeToHtml(vnode) {
   return `<${vnode.type}${attrs}>${inner}</${vnode.type}>`;
 }
 
+// ─────────────────────────────────────────────
+// diff(이전 VNode, 새 VNode) → patch 목록   ⭐ 핵심
+//   바뀐 곳마다 지시서 { op, path, ... } 를 한 장씩 만든다. 화면은 건드리지 않는다.
+//   path: 루트에서 몇 번째 자식으로 내려가는지. 루트 자신은 [].
+// ─────────────────────────────────────────────
+function diff(oldNode, newNode, path = [], patches = []) {
+  // ① 둘 다 글자: 다르면 TEXT
+  if (typeof oldNode === "string" && typeof newNode === "string") {
+    if (oldNode !== newNode) {
+      patches.push({ op: "TEXT", path, value: newNode });
+    }
+    return patches;
+  }
+
+  // ② 글자 ↔ 태그, 또는 태그 종류가 다름: 통째로 REPLACE
+  if (typeof oldNode === "string" || typeof newNode === "string" ||
+      oldNode.type !== newNode.type) {
+    patches.push({ op: "REPLACE", path, node: newNode });
+    return patches;
+  }
+
+  // ③ 같은 태그: 속성이 다르면 PROPS (바뀐 뒤 속성 전체를 담는다)
+  if (!sameProps(oldNode.props, newNode.props)) {
+    patches.push({ op: "PROPS", path, props: newNode.props });
+  }
+
+  // ④ 자식을 번호끼리 짝지어 비교한다
+  const oldKids = oldNode.children;
+  const newKids = newNode.children;
+  const shared = Math.min(oldKids.length, newKids.length);
+
+  // 양쪽에 다 있는 번호 → 같은 함수로 다시 비교 (재귀). path에 번호 하나를 붙여 내려간다
+  for (let i = 0; i < shared; i++) {
+    diff(oldKids[i], newKids[i], [...path, i], patches);
+  }
+
+  // 새 쪽에만 있는 번호 → CREATE
+  for (let i = shared; i < newKids.length; i++) {
+    patches.push({ op: "CREATE", path: [...path, i], node: newKids[i] });
+  }
+
+  // 이전 쪽에만 있는 번호 → REMOVE. 뒤에서부터 지운다
+  // (앞에서 지우면 뒤 자식들의 번호가 한 칸씩 당겨져서 엉뚱한 걸 지운다)
+  for (let i = oldKids.length - 1; i >= shared; i--) {
+    patches.push({ op: "REMOVE", path: [...path, i] });
+  }
+
+  return patches;
+}
+
+// 속성 이름과 값이 모두 같으면 true (적힌 순서는 상관없음)
+function sameProps(a, b) {
+  const aNames = Object.keys(a);
+  if (aNames.length !== Object.keys(b).length) return false;
+  return aNames.every((name) => a[name] === b[name]);
+}
+
 function escapeHtml(text) {
   return text
     .replaceAll("&", "&amp;")
