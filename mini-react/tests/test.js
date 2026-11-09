@@ -45,6 +45,25 @@ check(
   ] }
 );
 
+// 11/9 진훈 예측: children 1개 → 맞음. 줄바꿈이 든 공백(들여쓰기) 2개는 버린다
+check(
+  "domToVNode: 들여쓰기 공백은 버림",
+  domToVNode(makeDom("<div>\n  <p>안녕</p>\n</div>")),
+  { type: "div", props: {}, children: [
+    { type: "p", props: {}, children: ["안녕"] }
+  ] }
+);
+
+// 11/9 진훈 예측: ["안녕 ", [ {b} ]] → 공백 유지는 맞음, b를 [ ]로 한 번 더 감싼 곳이 깨짐
+check(
+  "domToVNode: 한 줄 안의 공백은 남김",
+  domToVNode(makeDom("<p>안녕 <b>철수</b></p>")),
+  { type: "p", props: {}, children: [
+    "안녕 ",
+    { type: "b", props: {}, children: ["철수"] }
+  ] }
+);
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.
