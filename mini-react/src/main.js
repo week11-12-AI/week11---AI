@@ -145,6 +145,54 @@ function diff(oldNode, newNode, path = [], patches = []) {
   return patches;
 }
 
+// ─────────────────────────────────────────────
+// applyPatches(실제 영역, patch 목록)   ⭐ 핵심
+//   지시서를 한 장씩 처리해 실제 DOM을 고친다. 실제 DOM을 바꾸는 함수는 이것 하나뿐.
+//   지시서에 적힌 노드만 고치고, 나머지 노드는 건드리지 않는다.
+// ─────────────────────────────────────────────
+function applyPatches(area, patches) {
+  for (const patch of patches) {
+    const { op, path } = patch;
+
+    if (op === "TEXT") {
+      findNode(area, path).textContent = patch.value;
+
+    } else if (op === "PROPS") {
+      const el = findNode(area, path);
+      // 새 속성에 없는 이전 속성은 지운다
+      for (const attr of [...el.attributes]) {
+        if (!(attr.name in patch.props)) el.removeAttribute(attr.name);
+      }
+      // 새 속성을 붙인다
+      for (const name in patch.props) {
+        el.setAttribute(name, patch.props[name]);
+      }
+
+    } else if (op === "REPLACE") {
+      findNode(area, path).replaceWith(createDom(patch.node));
+
+    } else if (op === "REMOVE") {
+      findNode(area, path).remove();
+
+    } else if (op === "CREATE") {
+      // path의 마지막 번호 = 새 노드가 들어갈 자리, 그 앞 = 부모의 위치
+      const parent = findNode(area, path.slice(0, -1));
+      const index = path.at(-1); // 마지막 번호 (-1 = 뒤에서 첫 번째)
+      const before = parent.childNodes[index] || null; // 그 자리에 있던 노드 앞에 끼움 (없으면 맨 끝)
+      parent.insertBefore(createDom(patch.node), before);
+    }
+  }
+}
+
+// path를 따라 실제 DOM에서 노드를 찾는다. [] = 실제 영역 안의 루트 요소
+function findNode(area, path) {
+  let node = area.firstChild;
+  for (const i of path) {
+    node = node.childNodes[i];
+  }
+  return node;
+}
+
 // 속성 이름과 값이 모두 같으면 true (적힌 순서는 상관없음)
 function sameProps(a, b) {
   const aNames = Object.keys(a);

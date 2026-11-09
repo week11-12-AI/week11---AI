@@ -151,6 +151,48 @@ check("diff REMOVE 여러 개: 뒤에서부터",
        v("div", {}, v("p", {}, "1"))),
   [{ op: "REMOVE", path: [2] }, { op: "REMOVE", path: [1] }]);
 
+// ── applyPatches ─────────────────────────────
+// 11/9 진훈 판정: 기대값 = 새 VNode (불변식: 고친 뒤 실제 영역을 VNode로 바꾸면 새 VNode와 같다)
+// 도구: 이전 VNode로 실제 영역을 그리고 → diff → applyPatches → 실제 영역을 다시 VNode로
+function patchAndRead(oldV, newV) {
+  const area = document.createElement("div");
+  area.appendChild(createDom(oldV));
+  applyPatches(area, diff(oldV, newV));
+  return domToVNode(area.firstChild);
+}
+
+const applyCases = [
+  ["TEXT", v("p", {}, "안녕"), v("p", {}, "하이")],
+  ["TEXT 깊이 2", v("div", {}, v("p", {}, "안녕"), v("b", {}, "철수")),
+                  v("div", {}, v("p", {}, "안녕"), v("b", {}, "영희"))],
+  ["PROPS 값 바꿈", v("p", { class: "a" }, "안녕"), v("p", { class: "b" }, "안녕")],
+  ["PROPS 속성 삭제", v("p", { class: "a", id: "x" }, "안녕"), v("p", { id: "x" }, "안녕")],
+  ["CREATE", v("div", {}, v("p", {}, "안녕")),
+             v("div", {}, v("p", {}, "안녕"), v("b", {}, "철수"))],
+  ["REMOVE", v("div", {}, v("p", {}, "안녕"), v("b", {}, "철수")),
+             v("div", {}, v("p", {}, "안녕"))],
+  ["REMOVE 여러 개", v("div", {}, v("p", {}, "1"), v("b", {}, "2"), v("i", {}, "3")),
+                     v("div", {}, v("p", {}, "1"))],
+  ["REPLACE", v("div", {}, v("p", {}, "안녕")), v("div", {}, v("span", {}, "안녕"))],
+  ["REPLACE 루트", v("p", {}, "안녕"), v("h1", {}, "안녕")],
+  ["글자 ↔ 태그", v("p", {}, "안녕"), v("p", {}, v("b", {}, "안녕"))],
+];
+for (const [name, oldV, newV] of applyCases) {
+  check(`applyPatches ${name}: 고친 뒤 = 새 VNode`, patchAndRead(oldV, newV), newV);
+}
+
+// 11/9 진훈 예측 (나): 바뀐 곳만 고친다 → 바뀌지 않은 형제 노드는 "같은 노드 객체" 그대로여야 한다
+{
+  const oldV = v("ul", {}, v("li", {}, "사과"), v("li", {}, "바나나"));
+  const newV = v("ul", {}, v("li", {}, "사과"), v("li", {}, "딸기"));
+  const area = document.createElement("div");
+  area.appendChild(createDom(oldV));
+  const appleBefore = area.firstChild.childNodes[0];
+  applyPatches(area, diff(oldV, newV));
+  check("applyPatches: 안 바뀐 '사과' li는 같은 노드 그대로",
+    area.firstChild.childNodes[0] === appleBefore, true);
+}
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.
