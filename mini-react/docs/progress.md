@@ -45,5 +45,13 @@
   - 줄 설명 통과: `h.list.length = h.index + 1` — 번호는 0부터라 지금 칸까지 남기려면 개수는 index + 1.
   - "서로 모른다" = history, diff, applyPatches가 독립된 레고 블록. 이어 붙이는 건 페이지 코드.
 
+- 페이지 연결 (`src/app.js`) → **Phase 1 완성** (계획보다 하루 빠름).
+  - Patch = 읽기 → 비교 → 고치기 → 저장 / ← → = 꺼내기 → 비교 → 고치기 → 편집기도 되돌리기
+  - 화면 이름을 바꿈: 실제 영역 → 화면, 테스트 영역 → HTML 편집기
+  - Paint flashing: 바나나→딸기 Patch 때 화면 상자 안에서 **한 줄만** 번쩍임 → (나) "바뀐 곳만 고친다"를 눈으로 확인. 발표 시연용.
+- 지인 대화: "AI 코드를 보고 이해 못 하면 실력 없음" vs "주 1회 손코딩". 가설 5 후보 (백지에서 5줄 함수 써 보기) — 미정.
+
 ## 다음
-1. 페이지 연결 (textarea + Patch / ← / →) → Phase 1 완성
+0. **백지에 전체 그림 그리기** (기억만으로): 편집기 글자 → htmlToDom → DOM → domToVNode → 새 VNode / history의 이전 VNode → diff → 지시서 → applyPatches → 화면. 막히는 화살표 = 모르는 곳.
+1. 기능 확인 나머지 (CREATE / REMOVE / REPLACE / PROPS를 화면에서 한 번씩) + 엣지 몇 개
+2. Phase 2 설계 (useState 중심)
