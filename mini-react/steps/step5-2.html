@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>계단 5-2 — setCount, useCount를 파일로</title>
+</head>
+<body>
+  <div id="app"></div>
+  <button id="btn">+1</button>
+  <button id="minus">-1</button>
+
+  <script src="../src/main.js"></script>
+  <script>
+    class FunctionComponent {
+      constructor(fn, container) {
+        this.fn = fn;
+        this.container = container;
+        this.oldVNode = null;
+        this.hooks = [0];
+      }
+      mount() {
+        this.oldVNode = this.fn();
+        this.container.appendChild(createDom(this.oldVNode));
+      }
+      update() {
+        const newVNode = this.fn();
+        const edit = diff(this.oldVNode, newVNode);
+        console.log("지시서:", JSON.stringify(edit));
+        applyPatches(this.container, edit);
+        this.oldVNode = newVNode;
+      }
+    }
+
+    // ✍️ 빈칸 1: 칸 값 바꾸기 + 다시 그리기 (콘솔에서 쓴 그대로)
+    function setCount(v) {
+      app.hooks[0] = v;
+      app.update();
+    }
+
+    // ✍️ 빈칸 2: [지금 값, setCount] 를 돌려주기 (콘솔에서 쓴 그대로)
+    function useCount() {
+      return [app.hooks[0], setCount];
+    }
+
+    function Counter() {
+      const [count, setCount] = useCount(); // 그릴 때마다 새 사진
+      return { type: "div", props: {}, children: [
+        { type: "h3", props: {}, children: ["카운터"] },
+        { type: "p",  props: {}, children: [String(count)] },
+      ] };
+    }
+
+    const app = new FunctionComponent(Counter, document.getElementById("app"));
+
+    document.getElementById("btn").onclick = function () {
+      const [count, setCount] = useCount();
+      setCount(count + 1);
+    };
+    document.getElementById("minus").onclick = function () {
+      const [count, setCount] = useCount();
+      setCount(count - 1);
+    };
+
+    app.mount();
+  </script>
+</body>
+</html>
