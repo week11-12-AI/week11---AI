@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mini React · DOM 실험실</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <a href="/phase2.html">Phase 2 · JSX와 VDOM →</a>
+      <h1>DOM 실험실</h1>
+      <p>오른쪽을 직접 편집하고 Patch를 눌러 왼쪽에 적용하세요. 요소를 클릭하면 편집 도구로 선택됩니다.</p>
+      <nav aria-label="적용과 히스토리">
+        <button id="patch-button" type="button">Patch 적용</button>
+        <button id="back" type="button">뒤로</button>
+        <button id="forward" type="button">앞으로</button>
+        <span id="history-position"></span>
+        <span id="dirty"></span>
+      </nav>
+      <p id="patch-status" role="status" aria-live="polite"></p>
+      <div class="columns">
+        <section>
+          <h2>실제 영역</h2>
+          <p>마지막으로 적용한 결과</p>
+          <div id="actual" class="surface"><div data-key="root"><h3 data-key="title">오늘의 샘플</h3><p class="message">공백과 <strong>중첩 요소</strong>를 보존합니다.</p><label><input data-key="done" type="checkbox" checked /> 확인 완료</label><input data-key="memo" aria-label="메모" value="유지할 입력값" /><ul><li>첫 항목</li><li>두 번째 항목</li></ul></div></div>
+        </section>
+        <section>
+          <h2>테스트 영역</h2>
+          <p>글자는 직접 수정하고 입력창·체크박스도 조작할 수 있습니다. 붙여넣기는 일반 텍스트로 처리합니다.</p>
+          <div id="editor" class="surface" contenteditable="true" role="group" aria-label="직접 편집 영역" spellcheck="false"></div>
+        </section>
+      </div>
+      <section class="tools" aria-labelledby="tools-heading">
+        <h2 id="tools-heading">선택 요소 편집</h2>
+        <label>요소 목록 <select id="element-picker"></select></label>
+        <p id="selection" aria-live="polite">요소를 선택하세요.</p>
+        <button id="select-parent" type="button">부모 선택</button>
+        <button id="clear-selection" type="button">선택 해제</button>
+        <button id="move-up" type="button">앞으로 이동</button>
+        <button id="move-down" type="button">뒤로 이동</button>
+        <button id="delete" type="button">요소 삭제</button>
+        <fieldset>
+          <legend>요소 추가 — 선택 요소 바로 뒤, 선택이 없으면 루트 마지막</legend>
+          <label>태그 <select id="new-tag"><option>p</option><option>h3</option><option>div</option><option>span</option><option>strong</option><option>button</option><option>input</option><option>textarea</option><option>ul</option><option>li</option></select></label>
+          <label>내용 / 입력값 <input id="new-text" value="새 요소" /></label>
+          <button id="add" type="button">요소 추가</button>
+        </fieldset>
+        <fieldset>
+          <legend>일반 속성 — 선택 요소에 적용</legend>
+          <label>속성 <select id="attribute-name"><option>class</option><option>title</option><option>id</option><option>placeholder</option><option>aria-label</option><option>value</option><option>checked</option><option>disabled</option><option>type</option></select></label>
+          <label>속성값 <input id="attribute-value" /></label>
+          <button id="set-attribute" type="button">속성 설정</button>
+          <button id="remove-attribute" type="button">속성 삭제</button>
+          <p>checked·disabled는 속성이 있으면 켜집니다. type은 input의 text·checkbox만 지원합니다.</p>
+          <pre id="selected-attributes"></pre>
+        </fieldset>
+        <fieldset>
+          <legend>key 관리 — 같은 부모 안에서 고유해야 합니다</legend>
+          <label>key <input id="key-value" /></label>
+          <button id="set-key" type="button">key 설정</button>
+          <button id="renew-key" type="button">새 key 발급</button>
+          <p id="key-errors" role="alert"></p>
+        </fieldset>
+      </section>
+      <details open><summary>변경 목록</summary><pre id="changes"></pre></details>
+      <details><summary>적용된 Virtual DOM</summary><pre id="vdom"></pre></details>
+    </main>
+    <style id="editor-markers"></style>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

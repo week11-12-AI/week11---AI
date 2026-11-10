@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Mini React · JSX와 VDOM</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main>
+      <a href="/">← Phase 1 DOM 실험실</a>
+      <h1>Phase 2 · JSX → VDOM</h1>
+      <p>첫 단계: JSX를 h() 호출로 바꾸고, 반환된 VDOM을 기존 createDOM()으로 화면에 표시합니다.</p>
+      <section class="tools">
+        <h2>1. 작성한 JSX</h2>
+        <pre>&lt;h3 className="title"&gt;할 일 목록&lt;/h3&gt;</pre>
+        <h2>2. 변환되는 함수 호출</h2>
+        <pre>h("h3", { className: "title" }, "할 일 목록")</pre>
+        <h2>3. h()가 반환한 VDOM</h2>
+        <pre id="jsx-vdom"></pre>
+        <h2>4. createDOM()으로 만든 실제 화면</h2>
+        <div id="jsx-result" class="surface"></div>
+      </section>
+      <p>현재는 정적 요소 생성까지 구현했습니다. 이벤트·State·Hooks는 이후 단계입니다.</p>
+    </main>
+    <script type="module" src="/src/phase2.jsx"></script>
+  </body>
+</html>
