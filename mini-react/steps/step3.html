@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>계단 3 — 다시 그리기를 Phase 1 블록으로</title>
+</head>
+<body>
+  <div id="app"></div>
+  <button id="btn">+1</button>
+  <button id="minus">-1</button>
+
+  <script src="../src/main.js"></script> <!-- Phase 1 블록: createDom, diff, applyPatches -->
+  <script>
+    let count = 0;        // 상태
+    let oldVNode = null;  // 지난번에 그린 VNode (diff의 "이전")
+    const area = document.getElementById("app");
+
+    // 상태 → VNode   (UI = f(state) 의 f)
+    function view() {
+      return { type: "div", props: {}, children: [
+        { type: "h3", props: {}, children: ["카운터"] },
+        { type: "p",  props: {}, children: [String(count)] },
+      ] };
+    }
+
+    // 처음 그리기: VNode를 통째로 DOM으로 만든다
+    function firstDraw() {
+      oldVNode = view();
+      area.appendChild(createDom(oldVNode));
+    }
+
+    // 다시 그리기: 새 VNode → diff(이전, 새) → applyPatches (바뀐 곳만)
+    // 11/10 진훈이 직접 씀 (생각 → 코드 연습)
+    function draw() {
+      newVNode = view()
+      edit = diff(oldVNode, newVNode);
+      console.log("지시서:", JSON.stringify(edit)); // 관찰용 (Claude가 추가)
+      applyPatches(area, edit);
+      oldVNode = newVNode; // 다음 diff를 위해 새 VNode를 oldVNode로 저장
+    }
+
+    document.getElementById("btn").onclick = function () {
+      count = count + 1; // ① 상태 바꾸기
+      draw();            // ② 다시 그리기
+    };
+
+    document.getElementById("minus").onclick = function () {
+      count = count - 1;
+      draw();
+    };
+
+    firstDraw();
+  </script>
+</body>
+</html>
