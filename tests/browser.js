@@ -265,6 +265,45 @@ test("Phase 1 화면에서 편집, Patch, 히스토리 이동, 빈 영역 복원
   } finally { frame.remove(); }
 });
 
+test("Phase 1은 Patch 후 지원하는 버튼 동작만 실행하고 Patch 이력을 유지한다", async () => {
+  const key = storageKey("lab");
+  const previous = localStorage.getItem(key);
+  localStorage.removeItem(key);
+  let frame;
+  try {
+    frame = await loadDemo();
+    const $ = selector => frame.contentDocument.querySelector(selector);
+    input($("#markup"), `<button id="sample-click" onclick="this.textContent = 'clicked'">click</button>
+<button id="sample-hidden" onclick="this.hidden = true">stay visible</button>`);
+    $("#preview #sample-click").click();
+    equal($("#preview #sample-click").textContent, "click");
+    equal($("#actual #sample-click"), null);
+
+    $("#apply-patch").click();
+    const button = $("#actual #sample-click");
+    equal(button.hasAttribute("onclick"), false);
+    button.click();
+    equal(button.textContent, "clicked");
+    equal($("#preview #sample-click").textContent, "click");
+    $("#actual #sample-hidden").click();
+    equal($("#actual #sample-hidden").hidden, false);
+
+    $("#apply-patch").click();
+    equal(button.textContent, "click");
+    equal($("#history-position").textContent, "2 / 2");
+    $("#history-back").click();
+    equal($("#actual #sample-click"), null);
+    $("#history-forward").click();
+    await reloadDemo(frame);
+    $("#actual #sample-click").click();
+    equal($("#actual #sample-click").textContent, "clicked");
+  } finally {
+    frame?.remove();
+    if (previous === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, previous);
+  }
+});
+
 test("T07: 공백만 입력하면 댓글을 등록할 수 없다", async () => {
   const key = storageKey("comments");
   const previous = localStorage.getItem(key);

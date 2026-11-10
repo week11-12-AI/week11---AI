@@ -10,20 +10,35 @@ const passiveElements = new Set([
   "g", "line", "path", "polygon", "polyline", "rect", "text", "title",
 ]);
 
+const clickTextAttribute = "data-lab-click-text";
+const clickTextPattern = /^\s*this\.textContent\s*=\s*(?:"([^"\\\r\n]*)"|'([^'\\\r\n]*)')\s*;?\s*$/;
+
 function readDraft(source, doc) {
   const template = doc.createElement("template");
   template.innerHTML = source;
-  // The editor previews passive markup rather than executing pasted code.
+  // Treat the supported button action as text data and strip inline handlers.
   for (const node of template.content.querySelectorAll("*")) {
     if (!passiveElements.has(node.localName)) {
       node.remove();
       continue;
     }
+    const inlineClick = node.getAttribute("onclick");
     for (const { name, value } of [...node.attributes]) {
-      if (/^on/i.test(name) || /^(srcdoc|srcset|autofocus|formaction)$/i.test(name)
+      if (/^on/i.test(name) || /^(srcdoc|srcset|autofocus|formaction|contenteditable|tabindex|accesskey)$/i.test(name)
         || (/^(href|src|xlink:href)$/i.test(name) && /^(javascript|vbscript|data):/i.test(value.replace(/[\s\u0000-\u001f]/g, "")))) {
         node.removeAttribute(name);
       }
+    }
+    if (node.localName === "button") {
+      if (inlineClick !== null) {
+        const action = clickTextPattern.exec(inlineClick);
+        if (action) node.setAttribute(clickTextAttribute, action[1] ?? action[2]);
+        else node.removeAttribute(clickTextAttribute);
+      }
+      if (node.hasAttribute(clickTextAttribute)) node.setAttribute("type", "button");
+      else node.setAttribute("inert", "");
+    } else if (node.matches("a, details, input, label, select, textarea")) {
+      node.setAttribute("inert", "");
     }
   }
   return element("div", { class: "sample-content" }, Array.from(template.content.childNodes, fromDOM));
@@ -42,7 +57,8 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
     entries: saved.entries.map(markup => ({ tree: readDraft(markup, doc), markup })),
     cursor: saved.cursor,
   } : undefined);
-  actualRoot = patch(actualRoot, diff(initial.tree, history.current.tree));
+  let actualTree = history.current.tree;
+  actualRoot = patch(actualRoot, diff(initial.tree, actualTree));
   editor.value = valid && typeof saved.draft === "string" ? saved.draft : history.current.markup;
   const previewTree = editor.value === history.current.markup ? history.current.tree : readDraft(editor.value, doc);
   let previewRoot = toDOM(previewTree, doc);
@@ -80,22 +96,31 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
     updatePreview();
     save();
   });
+  actual.addEventListener("click", event => {
+    const button = event.target.closest?.(`button[${clickTextAttribute}]`);
+    if (!button || button.disabled) return;
+    event.preventDefault();
+    button.textContent = button.getAttribute(clickTextAttribute);
+    actualTree = fromDOM(actualRoot);
+  });
   patchButton.addEventListener("click", () => {
     updatePreview();
     const next = fromDOM(previewRoot);
-    const patches = diff(history.current.tree, next);
+    const historyChanges = diff(history.current.tree, next);
+    const patches = actualTree === history.current.tree ? historyChanges : diff(actualTree, next);
     actualRoot = patch(actualRoot, patches);
-    if (patches.length) history.push({ tree: next, markup: actualRoot.innerHTML });
+    if (historyChanges.length) history.push({ tree: next, markup: actualRoot.innerHTML });
+    actualTree = history.current.tree;
     save();
     showChanges(patches);
   });
 
   function travel(direction) {
-    const previous = history.current;
     const next = history.move(direction);
     if (!next) return;
-    const patches = diff(previous.tree, next.tree);
+    const patches = diff(actualTree, next.tree);
     actualRoot = patch(actualRoot, patches);
+    actualTree = next.tree;
     previewRoot = patch(previewRoot, diff(fromDOM(previewRoot), next.tree));
     editor.value = next.markup;
     save();
