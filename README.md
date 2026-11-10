@@ -38,5 +38,3 @@ npm test
 Chrome 또는 Edge에서 DOM 변환·Diff·Patch·히스토리·Hook 단위 테스트와 두 Phase의 기능 테스트를 실행합니다. 브라우저가 다른 위치에 있으면 `BROWSER_PATH`에 실행 파일 경로를 지정하세요. 개발 서버를 켠 상태에서 <http://127.0.0.1:4173/tests/browser.html>로 결과를 직접 볼 수도 있습니다.
 
 과제의 제약에 따라 Hook은 루트에만 두고 상태 변경마다 동기적으로 갱신합니다. Diff는 바뀌지 않은 앞뒤 자식을 보존하고 나머지는 위치 기준으로 비교합니다. 목록의 `key` 기반 재배치와 선택 과제인 Batching은 구현 범위 밖입니다. Phase 1 편집기는 일반적인 표시용 HTML과 SVG를 미리보기로 지원합니다.
-
-참고: [학습 노트](https://github.com/hw-archive07/Learning-Content/blob/main/react-study-notes.md), [React useEffect](https://react.dev/reference/react/useEffect), [React useMemo](https://react.dev/reference/react/useMemo).
