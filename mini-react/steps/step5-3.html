@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>계단 5-3 — 칸 번호를 부른 순서로 (이어서 세기 vs 0부터)</title>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script src="../src/main.js"></script>
+  <script>
+    // ★ 실험 스위치
+    //   false = 다시 그릴 때 번호를 "이어서" 센다 (진훈 예측)
+    //   true  = 다시 그릴 때 번호를 "0부터 다시" 센다
+    //   11/10 실험 (false): +1 → hooks = [1,"철수",0,"철수"], 화면 count 0
+    //     → 다시 그릴 때 count가 빈 칸 2를 찾아가 초기값 0을 읽음. 칸이 매번 2개씩 늘어남.
+    //   설명 (진훈): hookIndex는 "이번 그리기에서 몇 번째인지" 세는 임시 변수라 매번 0부터.
+    const RESET = true;
+
+    class FunctionComponent {
+      constructor(fn, container) {
+        this.fn = fn;
+        this.container = container;
+        this.oldVNode = null;
+        this.hooks = [];      // 상태 칸 목록 (처음엔 비어 있음)
+        this.hookIndex = 0;   // 이번에 몇 번째 갈고리인지 세는 숫자
+      }
+      render() {
+        if (RESET) this.hookIndex = 0; // ★ 실험하는 줄
+        return this.fn();
+      }
+      mount() {
+        this.oldVNode = this.render();
+        this.container.appendChild(createDom(this.oldVNode));
+        console.log("처음 그림 → hooks =", JSON.stringify(this.hooks));
+      }
+      update() {
+        const newVNode = this.render();
+        applyPatches(this.container, diff(this.oldVNode, newVNode));
+        this.oldVNode = newVNode;
+        console.log("다시 그림 → hooks =", JSON.stringify(this.hooks));
+      }
+    }
+
+    // 갈고리: 5-2의 useCount에서 [0] 을 [i] 로 바꾼 것
+    function useState(initial) {
+      const i = app.hookIndex;   // 내 칸 번호 = 지금까지 센 숫자
+      app.hookIndex++;           // 다음 갈고리를 위해 1 올림
+      if (i >= app.hooks.length) app.hooks[i] = initial; // 칸이 없으면 초기값으로 만듦
+      console.log(`  useState(${JSON.stringify(initial)}) → 칸 ${i}`);
+      const setValue = function (v) { app.hooks[i] = v; app.update(); }; // 5-2의 setCount와 같음
+      return [app.hooks[i], setValue];
+    }
+
+    // 상태가 2개인 컴포넌트
+    function App() {
+      const [count, setCount] = useState(0);      // 1번째 갈고리
+      const [name,  setName]  = useState("철수");  // 2번째 갈고리
+      return { type: "div", props: {}, children: [
+        { type: "p", props: {}, children: ["count: " + count] },
+        { type: "p", props: {}, children: ["name: " + name] },
+        { type: "button", props: { onclick: function () { setCount(count + 1); } }, children: ["+1"] },
+        { type: "button", props: { onclick: function () { setName("영희"); } }, children: ["이름 바꾸기"] },
+      ] };
+    }
+
+    const app = new FunctionComponent(App, document.getElementById("app"));
+    app.mount();
+  </script>
+</body>
+</html>
