@@ -59,9 +59,40 @@
 - 팀: 수요일쯤 논의 전까지 **개인 플레이**로 진도. 2주에 과제 3개 (리액트 → 레디스 → DBMS). 기준은 내 학습과 성장.
 - Phase 2 예측 2개 맞힘: +1 → 글자 하나만 고침 (TEXT `[0,0]`) / 변수만 바꾸면 화면은 그대로 → 누군가 다시 그려야 함 (= setState의 일).
 
-## 다음
-- **11/9 저녁 (새 대화 시작):** 커밋 안 된 페이지 작업부터 커밋 (`index.html`, `src/app.js`, `CLAUDE.md`, `checklist.md`, `progress.md`) → Phase 2.
-  - Phase 2 첫 질문 (답하기 전에 끊김): 카운터 `div [ p ["0"], button ["+1"] ]`에서 +1을 누르면 → 새 VNode `div [ p ["1"], button ["+1"] ]`. 숫자를 바꾸는 지시서는? (정답 후보 `{op:"TEXT", path:[0,0], value:"1"}`, 사용자가 먼저 예측)
-  - Phase 2 그림: "상태가 바뀐다 → 함수(컴포넌트)가 VNode를 다시 만든다 → diff → applyPatches (Phase 1 블록 재사용)"
-- **11/10 (화) 10시 출근하면 Claude가 먼저 묻는다 (사용자 요청):** 백지에 전체 그림 그리기 (기억만으로): 편집기 글자 → htmlToDom → 임시 DOM → domToVNode → 새 VNode / history의 지금 VNode → diff → 지시서 → applyPatches → 화면 DOM → commit → 브라우저가 바뀐 곳만 다시 그림. 막히는 화살표 = 모르는 곳.
-- 11/10: useEffect / useMemo (되는 만큼) → README 초안. 11/11: 팀 선정 → README 다듬기 → 4분 리허설.
+- 예측 2개 더: `let count = 0`을 함수 안에 두면 매번 0부터 (예측 깨짐 → 스택 프레임) / 전역이면 유지 (맞음) / useState는 **부른 순서**로 칸을 찾음 / 다시 그려도 칸은 안 늘어남 (맞음).
+- Claude가 Phase 2 코드를 먼저 다 써 버려서(`src/component.js` 등) 1~8 흐름이 전부 안 읽힘 → **계단 방식**으로 바꿈. 정답지 코드는 커밋 안 하고 둠.
+  - 계단 1: onclick에 함수를 넘겨 두면 누를 때 실행 = `thread_create`의 함수 포인터 ✅
+  - 계단 2: 상태 바꾸고 `draw()` ✅ 실험: draw를 빼면 count 11, 화면 0 → **setCount = 값 바꾸기 + 바뀐 값으로 다시 그리기** (한 줄 설명 통과)
+  - 커밋: `a3ff1a2` 과제 원문, `6d5239b` 계단 1·2 (push 안 함)
+- 배운 문법: `document` = 페이지 전체(DOM 트리 맨 위) / `getElementById("num")` = 이름표로 상자 찾기 / `.` = "~의" / `//` 주석 / textContent = 태그는 그대로, 안의 글자 노드만 바뀜 (= TEXT)
+- AI 노하우 후보: 새 문법이 2개 이상 섞이면 계단, 조각을 다 알면 원래 사이클. 신호 = "정독했는데 안 들어온다". (판정 전)
+- 저녁 끝: 지쳐서 글·코드가 안 읽힘 → 계단 3 예측 직전에 멈춤.
+- 퇴근 30분 전: Claude가 쓴 블로그용 하루 정리를 정독 → "머릿속 정리 + 모르는 곳 파악"에 좋았다 (AI 노하우 후보).
+  - 정독해 보니 **useState 3줄이 전부 이해 안 됨** (hooks 배열 / 부른 순서 = 칸 번호 / 0부터 다시 셈 / if 안 Hook 금지). Claude가 ✅로 잘못 표시했음 → 블로그에서는 ❔로.
+
+## 2026-11-10 (화)
+- 백지 그림 통과: 7단계 중 5개 맞음. 고친 곳 2개 — htmlToDom은 **임시** DOM (화면 DOM과 다름) / 수정된 DOM을 다시 VNode로 읽지 않고 VDOM_new를 history에 commit (아끼는 것: 비싼 실제 DOM 읽기). 함수 이름은 까먹음.
+- 지인 조언: "생각을 코드로 바꾸는 훈련이 중요" → 지금까지는 코드 읽기만 했음 → 계단 3의 `draw()`를 **직접 씀** (가설 5 실험 시작).
+- 계단 3 ✅ (`74c9f55`): 내 draw()는 commit(`oldVNode = newVNode`)을 빠뜨림 → -1 버튼으로 깨짐 (count 0, 화면 1, 지시서 `[]`) → 원인 찾아 한 줄로 고침.
+  - view() = 상태로 설계도만 찍음 (printf의 빈칸 채우기, 화면 안 건드림) / draw() = 비교·고치기·저장.
+  - view()는 인자가 없는데 왜 f(state)? → 바깥 count를 몰래 읽음 (좋은 지적). VNode ≠ UI (설계도 vs 화면).
+  - DevTools Elements에서 `<p>`의 글자를 손으로 고쳐도 화면이 바뀜 → JS는 DOM만 고치고, 브라우저가 DOM을 보고 그린다.
+- 계단 4 ✅ (`0c74789`): 흩어진 것을 `class FunctionComponent`로 (C 구조체 + 함수). firstDraw → mount(처음 붙이기), draw → update.
+  - 설명 통과: `this.fn()` = Counter(). 51줄 `new`에서 함수를 값으로 넘겨 constructor가 fn 칸에 저장.
+  - 문법: this = 인스턴스 자신 / constructor는 new 때 자동 1번 / 메서드는 function 안 씀 / 전역·지역 × let·const.
+  - 실험: let/const 없이 쓴 `edit`이 draw() 실행 순간 **전역으로 몰래 생김** (누르기 전 not defined → 누른 뒤 보임).
+- 흐름 내 말로: 버튼 → count 바뀜 → update()가 Counter()로 새 VNode → old와 비교해 지시서 → DOM 첨삭 → (브라우저가 다시 그림 = 우리 코드 밖의 별도 과정).
+
+## 다음 — 11/10 (화) 순서 (Claude가 먼저 이끈다)
+1. **10:00 백지 그림 (Phase 1, 기억만으로)**: 편집기 글자 → htmlToDom → 임시 DOM → domToVNode → 새 VNode / history의 지금 VNode → diff → 지시서 → applyPatches → 화면 DOM → commit → 브라우저가 바뀐 곳만 다시 그림. 막히는 화살표 = 모르는 곳.
+2. **계단 3** (`steps/step3.html`, 만들어 둠, 미검증): `draw()` 속을 `view() → diff → applyPatches`로. 예측 질문부터: `div [ h3 ["카운터"], p ["0"] ]`에서 +1 → 지시서는? (사용자가 먼저 답)
+3. **계단 4**: 상태를 상자(`class`)로 = FunctionComponent. 새 문법 class, this → **C 구조체로 그림 먼저**.
+4. **계단 5 = 어제 이해 못 한 useState 3줄 검토** (그림 먼저, 실험으로 확인):
+   - 5-1 상태 1개: 상자의 `hooks` 칸에 저장 → 다시 그려도 값 유지
+   - 5-2 상태 2개: 이름이 아니라 **부른 순서**로 칸을 찾는다 (console.log로 칸 번호 찍기)
+   - 5-3 번호를 0부터 다시 세는 줄을 빼 보기 → 칸이 늘어나는 걸 눈으로 보기
+   - 5-4 ❔ Hook을 if 안에서 불러서 깨 보기 → 됐으면 ✅
+   - 끝나면 정답지 `src/component.js`와 비교 → 테스트 → 커밋. 남은 깨진 테스트(버튼 onclick이 매번 새 함수 → PROPS)도 여기서.
+5. 오후: useEffect → useMemo (되는 만큼) → README 초안.
+6. **퇴근 30분 전: 하루 정리 정독** (오늘 효과 좋았음, 루틴으로).
+- 11/11: 팀 논의·선정 → README 다듬기 → 4분 리허설.
