@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>계단 4 — 흩어진 것을 상자(class)로</title>
+</head>
+<body>
+  <div id="app"></div>
+  <button id="btn">+1</button>
+  <button id="minus">-1</button>
+
+  <script src="../src/main.js"></script> <!-- Phase 1 블록: createDom, diff, applyPatches -->
+  <script>
+    // ── 상자 설계도 (C의 struct + 함수들) ──────────────
+    class FunctionComponent {
+      // new 할 때 한 번 실행: 필드 초기화
+      constructor(fn, container) {
+        this.fn = fn;               // 설계도 찍는 함수   (step3의 view)
+        this.container = container; // 붙일 자리          (step3의 area)
+        this.oldVNode = null;       // 지난번 설계도       (step3의 oldVNode)
+      }
+
+      // 처음 그리기 (step3의 firstDraw)
+      mount() {
+        this.oldVNode = this.fn();
+        this.container.appendChild(createDom(this.oldVNode));
+      }
+
+      // 다시 그리기 (step3의 draw — 진훈이 쓴 4줄 그대로)
+      update() {
+        const newVNode = this.fn();
+        const edit = diff(this.oldVNode, newVNode);
+        console.log("지시서:", JSON.stringify(edit));
+        applyPatches(this.container, edit);
+        this.oldVNode = newVNode;
+      }
+    }
+
+    // ── 상태와 컴포넌트 함수 ───────────────────────────
+    let count = 0; // 상태 (아직 상자 밖. 계단 5에서 상자 안으로)
+
+    // 컴포넌트 함수 = step3의 view (이름만 바꿈)
+    function Counter() {
+      return { type: "div", props: {}, children: [
+        { type: "h3", props: {}, children: ["카운터"] },
+        { type: "p",  props: {}, children: [String(count)] },
+      ] };
+    }
+
+    // ── 상자 만들기 (malloc + 초기화) ──────────────────
+    const app = new FunctionComponent(Counter, document.getElementById("app"));
+
+    document.getElementById("btn").onclick = function () {
+      count = count + 1;
+      app.update();
+    };
+    document.getElementById("minus").onclick = function () {
+      count = count - 1;
+      app.update();
+    };
+
+    app.mount(); // 페이지 열 때 한 번 (step3의 firstDraw())
+  </script>
+</body>
+</html>
