@@ -265,6 +265,32 @@ test("Phase 1 화면에서 편집, Patch, 히스토리 이동, 빈 영역 복원
   } finally { frame.remove(); }
 });
 
+test("T07: 공백만 입력하면 댓글을 등록할 수 없다", async () => {
+  const key = storageKey("comments");
+  const previous = localStorage.getItem(key);
+  localStorage.removeItem(key);
+  let frame;
+  try {
+    frame = await loadDemo();
+    const $ = selector => frame.contentDocument.querySelector(selector);
+    $("#toggle-composer").click();
+    const form = $("#comment-form");
+    const submit = form.querySelector("button[type=submit]");
+
+    input($("#comment-draft"), " \t\n ");
+    equal(submit.disabled, true);
+    submit.click();
+    form.requestSubmit();
+
+    equal($("#comment-list"), null);
+    equal($("#comment-summary").textContent, "댓글 0개 · 총 0자");
+  } finally {
+    frame?.remove();
+    if (previous === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, previous);
+  }
+});
+
 test("Phase 2에서 좋아요와 댓글이 갱신되고 작성창 밖의 노드를 유지한다", async () => {
   const frame = await loadDemo();
   try {
@@ -290,7 +316,13 @@ test("Phase 2에서 좋아요와 댓글이 갱신되고 작성창 밖의 노드�
     $("#toggle-composer").click();
     equal($("#comment-draft").value, "DOM 노드 유지");
     $("#comment-form button").click();
-    equal($("#comment-list li").textContent, "DOM 노드 유지");
+    equal($("#comment-list .comment-text").textContent, "DOM 노드 유지");
+    const registeredAt = $("#comment-list time");
+    assert(Number.isFinite(Date.parse(registeredAt.dateTime)));
+    assert(/^\d{2}:\d{2}$/.test(registeredAt.textContent), "registration time must show only hours and minutes");
+    const replyButton = registeredAt.nextElementSibling;
+    assert(replyButton.matches(".reply-toggle"), "registration time must precede the reply button");
+    assert(replyButton.nextElementSibling.matches(".comment-like"), "reply must precede the like button");
     equal($("#comment-draft").value, "");
     equal($("#comment-summary"), summary);
     equal(summary.textContent, "댓글 1개 · 총 9자");
@@ -298,10 +330,50 @@ test("Phase 2에서 좋아요와 댓글이 갱신되고 작성창 밖의 노드�
   } finally { frame.remove(); }
 });
 
+test("댓글은 좋아요 순으로 정렬하고 10개부터 1위에 인기 표시를 붙인다", async () => {
+  const key = storageKey("comments");
+  const previous = localStorage.getItem(key);
+  const frame = await loadDemo();
+  try {
+    const runId = frame.contentDocument.querySelector('meta[name="mini-react-run"]').content;
+    localStorage.setItem(key, JSON.stringify({ runId, value: { comments: ["첫 댓글", "둘째 댓글"] } }));
+    await reloadDemo(frame);
+    const doc = frame.contentDocument;
+    const $ = selector => doc.querySelector(selector);
+    const order = () => [...doc.querySelectorAll("#comment-list .comment-text")].map(node => node.textContent).join(",");
+    const winner = () => $("#comment-list .badge")?.closest("li").querySelector(".comment-text").textContent;
+
+    equal(order(), "첫 댓글,둘째 댓글");
+    equal($("#comment-list .badge"), null);
+    equal($("#comment-list .comment-time").textContent, "시간 미기록");
+    equal($('[data-comment-index="0"]').textContent, "좋아요 0");
+    const second = $('[data-comment-index="1"]');
+    second.focus();
+    second.click();
+    equal(order(), "둘째 댓글,첫 댓글");
+    equal(doc.activeElement, $('[data-comment-index="1"]'));
+    for (let count = 1; count < 9; count += 1) $('[data-comment-index="1"]').click();
+    equal($("#comment-list .badge"), null);
+    $('[data-comment-index="1"]').click();
+    equal(winner(), "둘째 댓글");
+
+    for (let count = 0; count < 10; count += 1) $('[data-comment-index="0"]').click();
+    equal(order(), "첫 댓글,둘째 댓글");
+    equal(winner(), "첫 댓글");
+    equal(doc.querySelectorAll("#comment-list .badge").length, 1);
+    equal($('[data-comment-index="0"]').textContent, "좋아요 10");
+    equal($('[data-comment-index="1"]').textContent, "좋아요 10");
+  } finally {
+    frame.remove();
+    if (previous === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, previous);
+  }
+});
+
 const lifecycle = new URLSearchParams(location.search).get("lifecycle");
 const appKeys = [storageKey("likes"), storageKey("lab"), storageKey("comments")];
 
-test("새로고침은 좋아요, 댓글과 초안, Patch 기록과 HTML 초안을 복원한다", async () => {
+test("답글 목록을 접고 펼칠 수 있으며 새로고침하면 댓글과 Patch 상태가 복원된다", async () => {
   for (const key of appKeys) localStorage.removeItem(key);
   const frame = await loadDemo();
   try {
@@ -311,6 +383,31 @@ test("새로고침은 좋아요, 댓글과 초안, Patch 기록과 HTML 초안�
     $("#toggle-composer").click();
     input($("#comment-draft"), "등록한 댓글");
     $("#comment-form button").click();
+    $("#comment-list .comment-like").click();
+    $("#comment-list .comment-like").click();
+    const commentTime = $("#comment-list time").dateTime;
+    equal($("#comment-list .replies-toggle"), null);
+    $("#comment-list .reply-toggle").click();
+    const replyForm = $("#reply-form-0");
+    input(replyForm.querySelector("textarea"), " \t\n ");
+    equal(replyForm.querySelector("button").disabled, true);
+    replyForm.requestSubmit();
+    equal($("#comment-list .reply-text"), null);
+    input(replyForm.querySelector("textarea"), "등록한 대댓글");
+    replyForm.querySelector("button").click();
+    const replyTime = $("#comment-list .comment-replies time").dateTime;
+    assert(Number.isFinite(Date.parse(replyTime)));
+    const repliesToggle = $("#comment-list .replies-toggle");
+    const replies = $("#comment-replies-0");
+    equal(repliesToggle.textContent, "답글 접기 ↑");
+    repliesToggle.click();
+    equal(repliesToggle.textContent, "답글 펼치기 ↓");
+    equal(repliesToggle.getAttribute("aria-expanded"), "false");
+    equal(frame.contentWindow.getComputedStyle(replies).display, "none");
+    repliesToggle.click();
+    equal(replies.hidden, false);
+    equal(repliesToggle.getAttribute("aria-expanded"), "true");
+    repliesToggle.click();
     input($("#comment-draft"), "작성 중인 댓글");
     const initial = $("#markup").value;
     input($("#markup"), initial.replace("이번 주 학습", "Patch A"));
@@ -323,7 +420,15 @@ test("새로고침은 좋아요, 댓글과 초안, Patch 기록과 HTML 초안�
 
     await reloadDemo(frame);
     equal($("#like-button").textContent, "좋아요 2");
-    equal($("#comment-list li").textContent, "등록한 댓글");
+    equal($("#comment-list .comment-text").textContent, "등록한 댓글");
+    equal($("#comment-list .comment-like").textContent, "좋아요 2");
+    equal($("#comment-list .badge"), null);
+    equal($("#comment-list time").dateTime, commentTime);
+    equal($("#comment-replies-0").hidden, true);
+    $("#comment-list .replies-toggle").click();
+    equal($("#comment-replies-0").hidden, false);
+    equal($("#comment-list > li .reply-text").textContent, "등록한 대댓글");
+    equal($("#comment-list .comment-replies time").dateTime, replyTime);
     equal($("#comment-draft").value, "작성 중인 댓글");
     equal($("#actual h3").textContent, "Patch A");
     equal($("#preview h3").textContent, "미적용 초안");
@@ -344,7 +449,9 @@ if (lifecycle === "restart") {
     const previousDiscussion = JSON.parse(localStorage.getItem(storageKey("comments")));
     equal(previousLikes.value, 2);
     equal(previousLab.value.cursor, 2);
-    equal(previousDiscussion.value.comments[0], "등록한 댓글");
+    equal(previousDiscussion.value.comments[0].text, "등록한 댓글");
+    equal(previousDiscussion.value.comments[0].likes, 2);
+    equal(previousDiscussion.value.comments[0].replies[0].text, "등록한 대댓글");
     equal(previousDiscussion.value.draft, "작성 중인 댓글");
     const frame = await loadDemo();
     try {

@@ -44,7 +44,8 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
   } : undefined);
   actualRoot = patch(actualRoot, diff(initial.tree, history.current.tree));
   editor.value = valid && typeof saved.draft === "string" ? saved.draft : history.current.markup;
-  let previewRoot = toDOM(readDraft(editor.value, doc), doc);
+  const previewTree = editor.value === history.current.markup ? history.current.tree : readDraft(editor.value, doc);
+  let previewRoot = toDOM(previewTree, doc);
   preview.append(previewRoot);
 
   const observer = new MutationObserver(() => {});

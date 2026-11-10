@@ -58,7 +58,18 @@ textarea { display: block; width: 100%; border: 1px solid #aab9c0; padding: 10px
 .composer { margin-top: 13px; }
 .composer .button { margin-top: 8px; }
 .comment-list { margin-top: 17px; border-top: 1px solid var(--line); padding-top: 13px; }
-.comment-list ul { padding-left: 24px; overflow-wrap: anywhere; }
+.comment-list ul { margin: 8px 0 0; padding: 0; list-style: none; }
+.comment-row { padding: 9px 0; }
+.comment-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.comment-row + .comment-row { border-top: 1px solid var(--line); }
+.comment-text { flex: 1 1 180px; min-width: 0; overflow-wrap: anywhere; }
+.comment-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.button.replies-toggle { border-color: transparent; background: transparent; color: var(--accent); font-size: .75rem; padding: 3px 5px; }
+.comment-controls { display: inline-flex; align-items: center; gap: 6px; }
+.comment-time { color: var(--muted); font-size: .75rem; white-space: nowrap; }
+.comment-list .comment-replies, .reply-composer { margin: 8px 0 0 14px; border-left: 2px solid var(--line); padding-left: 12px; }
+.reply-row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; padding: 4px 0; }
+.reply-text { overflow-wrap: anywhere; min-width: 0; }
 .hook-guide dl { margin: 9px 0 0; }
 .hook-guide dt { color: var(--accent); font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
 .hook-guide dd { margin: 0 0 11px; color: var(--muted); font-size: .9rem; }
