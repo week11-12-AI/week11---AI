@@ -1,0 +1,9 @@
+{
+  "name": "week11-mini-react",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/server.mjs",
+    "test": "node scripts/test.mjs"
+  }
+}
