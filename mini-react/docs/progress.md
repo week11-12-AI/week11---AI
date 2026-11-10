@@ -83,6 +83,10 @@
   - 실험: let/const 없이 쓴 `edit`이 draw() 실행 순간 **전역으로 몰래 생김** (누르기 전 not defined → 누른 뒤 보임).
 - 흐름 내 말로: 버튼 → count 바뀜 → update()가 Counter()로 새 VNode → old와 비교해 지시서 → DOM 첨삭 → (브라우저가 다시 그림 = 우리 코드 밖의 별도 과정).
 
+- 70분 집중 후 휴식. 멈춘 곳: **"Counter()가 (새) VNode를 만든다"가 안 와닿음** (view = printf 설명, 시간표 설명 둘 다 안 통함).
+  - 재개: 설명 반복 말고 콘솔에서 작게 쌓기 — 숫자 돌려주는 함수 → 글자 돌려주는 함수 → 객체(VNode) 돌려주는 함수. 그다음 계단 5.
+  - push 안 된 커밋 3개 (계단 3, 4, 진행 기록).
+
 ## 다음 — 11/10 (화) 순서 (Claude가 먼저 이끈다)
 1. **10:00 백지 그림 (Phase 1, 기억만으로)**: 편집기 글자 → htmlToDom → 임시 DOM → domToVNode → 새 VNode / history의 지금 VNode → diff → 지시서 → applyPatches → 화면 DOM → commit → 브라우저가 바뀐 곳만 다시 그림. 막히는 화살표 = 모르는 곳.
 2. **계단 3** (`steps/step3.html`, 만들어 둠, 미검증): `draw()` 속을 `view() → diff → applyPatches`로. 예측 질문부터: `div [ h3 ["카운터"], p ["0"] ]`에서 +1 → 지시서는? (사용자가 먼저 답)

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>계단 5-1 — count를 상자 안 칸으로</title>
+</head>
+<body>
+  <div id="app"></div>
+  <button id="btn">+1</button>
+  <button id="minus">-1</button>
+
+  <script src="../src/main.js"></script>
+  <script>
+    class FunctionComponent {
+      constructor(fn, container) {
+        this.fn = fn;
+        this.container = container;
+        this.oldVNode = null;
+        this.hooks = [0];           // ★ 새로 추가: 상태 칸 목록. 0번 칸 = count
+      }
+
+      mount() {
+        this.oldVNode = this.fn();
+        this.container.appendChild(createDom(this.oldVNode));
+      }
+
+      update() {
+        const newVNode = this.fn();
+        const edit = diff(this.oldVNode, newVNode);
+        console.log("지시서:", JSON.stringify(edit));
+        applyPatches(this.container, edit);
+        this.oldVNode = newVNode;
+      }
+    }
+
+    // ★ let count = 0; 은 지웠다 (상자 안으로 옮김)
+
+    function Counter() {
+      return { type: "div", props: {}, children: [
+        { type: "h3", props: {}, children: ["카운터"] },
+        { type: "p",  props: {}, children: [String(app.hooks[0])] }, // ★ 칸에서 읽기
+      ] };
+    }
+
+    const app = new FunctionComponent(Counter, document.getElementById("app"));
+
+    document.getElementById("btn").onclick = function () {
+      app.hooks[0] = app.hooks[0] + 1; // ★ 칸을 바꾸기
+      app.update();
+    };
+    document.getElementById("minus").onclick = function () {
+      app.hooks[0] = app.hooks[0] - 1; // ★
+      app.update();
+    };
+
+    app.mount();
+  </script>
+</body>
+</html>
