@@ -215,6 +215,59 @@ for (const [name, oldV, newV] of applyCases) {
   check("history: 처음에서 ← 는 그대로", h.index, 0);
 }
 
+// ── Phase 2: FunctionComponent + useState ────
+// 테스트용 카운터: 숫자 p + 버튼
+function TestCounter() {
+  const [count, setCount] = useState(0);
+  return h("div", {},
+    h("p", {}, count),
+    h("button", { onclick: () => setCount(count + 1) }, "+1"));
+}
+function mountCounter() {
+  const area = document.createElement("div");
+  const comp = new FunctionComponent(TestCounter, area);
+  comp.mount();
+  const button = () => area.firstChild.childNodes[1];
+  return { area, comp, button };
+}
+
+check("mount: 처음 hooks = [0]", mountCounter().comp.hooks, [0]);
+
+// 11/9 진훈 예측 (가): 다시 그릴 때마다 번호를 0부터 다시 세서 칸은 늘지 않는다
+{
+  const { area, comp, button } = mountCounter();
+  button().click(); button().click(); button().click();
+  check("useState: 3번 누르면 hooks = [3] (칸은 1개 그대로)", comp.hooks, [3]);
+  check("useState: 3번 누르면 화면 숫자 3", area.firstChild.childNodes[0].textContent, "3");
+}
+
+// 11/9 진훈 예측 (가): +1 누르면 숫자 글자 하나만 고친다 → 깨짐: TEXT + 버튼 PROPS
+// 11/10 판정: 기대값을 고친다. 근거 = "3번 누르면 화면 3"이 통과 (동작은 맞음).
+//   버튼 onclick은 그릴 때마다 그때의 count를 품은 새 함수라 diff가 PROPS로 본다.
+//   ❔ 원리(클로저)는 useEffect 0 그림 단계에서 이 예제로 다시 본다 (예약).
+{
+  const { comp, button } = mountCounter();
+  button().click();
+  check("update: +1 지시서는 TEXT(숫자) + PROPS(버튼 onclick 새 함수)",
+    comp.lastPatches.map((p) => `${p.op} ${JSON.stringify(p.path)}`),
+    ["TEXT [0,0]", "PROPS [1]"]);
+}
+
+// 11/9 진훈 예측 (나): useState는 이름이 아니라 부른 순서로 자기 칸을 찾는다
+{
+  let setNameOut;
+  function TwoStates() {
+    const [count] = useState(0);
+    const [name, setName] = useState("철수");
+    setNameOut = setName;
+    return h("p", {}, count, " ", name);
+  }
+  const comp = new FunctionComponent(TwoStates, document.createElement("div"));
+  comp.mount();
+  setNameOut("영희");
+  check("useState 2개: 순서대로 칸 0, 1", comp.hooks, [0, "영희"]);
+}
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.

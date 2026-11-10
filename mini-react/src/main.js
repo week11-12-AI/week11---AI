@@ -60,9 +60,9 @@ function createDom(vnode) {
   // 상자 → 태그
   const el = document.createElement(vnode.type);
 
-  // 속성 붙이기  { class: "a" } → class="a"
+  // 속성 붙이기  { class: "a" } → class="a"   (onclick 같은 함수는 이벤트로)
   for (const name in vnode.props) {
-    el.setAttribute(name, vnode.props[name]);
+    setProp(el, name, vnode.props[name]);
   }
 
   // 자식 붙이기. 자식 상자는 같은 함수로 다시 만든다 (재귀)
@@ -165,7 +165,7 @@ function applyPatches(area, patches) {
       }
       // 새 속성을 붙인다
       for (const name in patch.props) {
-        el.setAttribute(name, patch.props[name]);
+        setProp(el, name, patch.props[name]);
       }
 
     } else if (op === "REPLACE") {
@@ -224,6 +224,16 @@ function back(h) {
 function forward(h) {
   if (h.index < h.list.length - 1) h.index = h.index + 1;
   return current(h);
+}
+
+// 속성 하나 붙이기. 이름이 on으로 시작하고 값이 함수면 이벤트 핸들러 (Phase 2)
+//   el.onclick = 함수 → 덮어쓰기라서 새 함수로 바꿔 끼우기 쉽다
+function setProp(el, name, value) {
+  if (name.startsWith("on") && typeof value === "function") {
+    el[name] = value;
+  } else {
+    el.setAttribute(name, value);
+  }
 }
 
 // 속성 이름과 값이 모두 같으면 true (적힌 순서는 상관없음)
