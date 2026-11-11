@@ -1,52 +1,66 @@
 # mini-react
 
-Vanilla JavaScript로 React의 핵심 원리(Virtual DOM, diff, patch, hooks)를 직접 만들어 보는 프로젝트.
-크래프톤 정글 13기 11주차 · 개인 구현.
+Vanilla JS로 React의 핵심(Virtual DOM, diff, Hooks)을 직접 만들고 그걸로 웹페이지를 만들면서, AI가 만든 코드를 동작 테스트로 검증하는 실험을 했다.
 
-> 상태: **Phase 1 구현 중** (발표 전에 이 README를 완성한다)
+크래프톤 정글 13기 11주차 · 개인 구현
 
-## 목표
-1. React 내부 원리를 **예측**하고 **설명**하고 **수정**할 수 있다.
-2. AI를 쓰는 나만의 노하우를 찾는다 → [docs/ai-log.md](docs/ai-log.md)
+## 1. React의 원리
 
-## 실행
-- 페이지: `index.html`을 VS Code에서 우클릭 → **Open with Live Server**
-- 테스트: `tests/test.html`을 같은 방법으로 열고 브라우저 콘솔(F12)을 본다
+- react는 저장한 상태로 렌더링한다
+- 상태가 변했을 때, 변한 것만 업데이트한다
+- 함수 안에는 상태를 저장하지 않는다. 상태를 hooks에 두는 이유는, 컴포넌트마다 상태를 저장하기 위해서다
 
-## 흐름 (Phase 1)
+### 변한 것만 업데이트하는 흐름 (Phase 1)
 ```
 HTML 글자 ──htmlToDom──▶ DOM ──domToVNode──▶ VNode
                                               │
               이전 VNode ─┐                    │
-                          diff ──▶ patch 목록 ──applyPatches──▶ 실제 DOM (바뀐 곳만)
+                          diff ──▶ 지시서 목록 ──applyPatches──▶ 실제 DOM (바뀐 곳만)
               새 VNode ───┘
 ```
 
-## 함수
-| 함수 | 입력 → 출력 | 상태 |
-|---|---|---|
-| `htmlToDom` | 글자 → DOM | ⬜ |
-| `domToVNode` | DOM → VNode | ⬜ |
-| `createDom` | VNode → DOM | ⬜ |
-| `vnodeToHtml` | VNode → 글자 | ⬜ |
-| `diff` | (이전, 새) → patch[] | ⬜ |
-| `applyPatches` | (실제 영역, patch[]) → DOM 수정 | ⬜ |
-| history | commit / back / forward / current | ⬜ |
-
-## 폴더
+### 상태가 바뀌면 다시 그리는 흐름 (Phase 2)
 ```
-mini-react/
-├─ index.html          Phase 1 페이지
-├─ src/main.js         구현
-├─ tests/              브라우저 테스트
-├─ CLAUDE.md           AI 작업 규칙
-└─ docs/
-   ├─ checklist.md     단계별 체크리스트 (지금 어디인지)
-   ├─ progress.md      날짜별 진행
-   ├─ ai-log.md        AI 사용 기록 + 노하우 가설
-   ├─ templates/cycle-note.md  함수 하나당 노트 양식
-   └─ (슬랙 글, 설계·검증 초안, AI 활용 방식)
+버튼 클릭 → setState(새 값) → hooks 칸 값 바꾸기 → update()
+         → 컴포넌트 함수 다시 실행 → 새 VNode → diff → applyPatches (바뀐 곳만)
 ```
 
-## 실제 React와 다른 점
-(발표 전에 채운다)
+### Hooks
+| Hook | 기억하는 것 |
+|---|---|
+| useState | 상태 값 |
+| useEffect | 다 그린 뒤 할 일 (감시 값이 바뀔 때만) |
+| useMemo | 계산 결과 (감시 값이 바뀔 때만 다시 계산) |
+
+## 2. 시연 (`demo.html`, 할 일 목록)
+- 완료 → 취소선이 그어지고 남은 일 숫자가 줄어든다
+- 남은 일만 → 완료 안 된 일만 남는다
+- 완료된 일 지우기 → 완료된 일만 사라지고 남은 일 숫자는 그대로. 완료된 일이 없으면 버튼이 회색
+- 추가, 삭제
+
+(패널 설명: 작성 중)
+
+## 3. 검증 레이어 실험: "완료된 일 지우기"
+- 요구 카드 → 기대값 설정
+- 기대값 판정 → 실험으로 실제값을 도출해서, 기대값과 비교: 같을 때까지 기대값 또는 코드를 수정
+- 레드팀 → 시스템의 허점(예외)을 찾으려고 노력
+- PR 리뷰 → 첨삭된 코드를 검토 (만약 코드 못 읽으면, 코드 실행된 결과인, 동작 테스트로 대체)
+- 커밋 → 커밋 메시지에 과정을 요약
+
+**결과**: PR 리뷰 단계가 잘 안 됐다. JS 코드를 못 읽어서다. 코드를 이해해서 검증하는 게 아니라, 코드를 실행시켜서 의도대로 동작하는지를 판정의 기준으로 적용했다.
+
+반대로 요구사항, 기대값 판정, 레드팀은 잘 됐다. 셋 다 코드를 읽지 않고, 사용자 입장에서 요구사항과 화면 동작을 비교하면 되는 단계라서다. 레드팀에서는 요구사항을 정할 때 놓친 허점("남은 일만" 보기에서도 지우기 버튼이 눌림)을 찾아 코드를 고쳤다.
+
+정리: 모르는 언어에서는 **코드를 읽는 검증은 무너지고, 동작을 보는 검증은 작동한다.**
+
+## 4. 화두
+- 이 변경에서 무엇이 잘못될 수 있고, 어떤 검사가 잡아야 하나?
+- 내 시간과 주의력을 어디에 쓰는 게 가치 있나?
+- 어떻게는 몰라도, 무엇이 맞는지는 내가 판단해야 한다
+
+## 5. 실제 React와 다른 점
+- useEffect: 실제 React는 브라우저가 화면을 그린 뒤 실행한다. 이 구현은 DOM을 고친 직후 실행한다.
+
+## 실행
+- 시연: `demo.html`을 VS Code에서 우클릭 → **Open with Live Server**
+- 테스트: `tests/test.html`(단위 42개), `tests/demo.test.html`(시연 9개)을 같은 방법으로 연다
