@@ -309,6 +309,45 @@ check("useEffect: 처음 그리면 실행됨", mountEffectTest().log, ["count=0 
     log, ["count=0 화면=0", "count=1 화면=1"]);
 }
 
+// ── Phase 2: useMemo ─────────────────────────
+// ❔ 11/11: 기대값 3개는 Claude 판정, 진훈 미확인. README 쓸 때 다시 본다.
+//   한 줄: 같은 문제(감시 값 그대로)면 답을 다시 풀지 않고 적어 둔 답을 꺼내 쓴다.
+// 테스트용 컴포넌트: 상태 2개(count, name) + count만 감시하는 "무거운 계산" (count * 100)
+//   계산 함수가 실행될 때마다 calls에 1을 더한다 → 몇 번 다시 계산했는지 센다
+function mountMemoTest() {
+  const area = document.createElement("div");
+  const stats = { calls: 0 };
+  const set = {};
+  function MemoTest() {
+    const [count, setCount] = useState(1);
+    const [name, setName] = useState("철수");
+    set.count = setCount;
+    set.name = setName;
+    const big = useMemo(function () { stats.calls++; return count * 100; }, [count]);
+    return h("div", {}, h("p", {}, big), h("p", {}, name));
+  }
+  new FunctionComponent(MemoTest, area).mount();
+  const shown = () => area.firstChild.childNodes[0].textContent;
+  return { stats, set, shown };
+}
+
+check("useMemo: 처음엔 계산 1번, 화면 100", (() => {
+  const { stats, shown } = mountMemoTest();
+  return [stats.calls, shown()];
+})(), [1, "100"]);
+
+check("useMemo: 감시 값(count) 그대로면 다시 계산 안 함", (() => {
+  const { stats, set, shown } = mountMemoTest();
+  set.name("영희");
+  return [stats.calls, shown()];
+})(), [1, "100"]);
+
+check("useMemo: 감시 값이 바뀌면 다시 계산", (() => {
+  const { stats, set, shown } = mountMemoTest();
+  set.count(2);
+  return [stats.calls, shown()];
+})(), [2, "200"]);
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.

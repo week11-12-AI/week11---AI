@@ -123,3 +123,28 @@ function useEffect(effect, deps) {
     comp.effects.push(effect); // 할 일 메모
   }
 }
+
+// ─────────────────────────────────────────────
+// useMemo(계산 함수, 감시 목록) → 계산 결과   ⭐ 핵심
+//   무거운 계산 결과를 칸에 메모해 두고, 감시 값이 그대로면 다시 계산하지 않는다
+//   감시 규칙은 useEffect와 같다. 다른 점: 다 그린 뒤가 아니라 "지금 바로" 계산해서 값을 돌려준다
+//   칸에는 { 값, 감시 목록 } 을 저장한다
+// ─────────────────────────────────────────────
+function useMemo(compute, deps) {
+  const comp = currentComponent;
+  if (!comp) throw new Error("useMemo는 컴포넌트 함수 안에서만 부를 수 있다");
+
+  const i = comp.hookIndex; // 같은 번호표를 같이 쓴다
+  comp.hookIndex++;
+
+  const prev = comp.hooks[i]; // { value, deps } 또는 처음엔 undefined
+  const changed =
+    prev === undefined ||
+    deps === undefined ||
+    deps.some((value, k) => value !== prev.deps[k]);
+
+  if (changed) {
+    comp.hooks[i] = { value: compute(), deps }; // 다시 계산해서 메모
+  }
+  return comp.hooks[i].value; // 메모해 둔 값을 돌려준다
+}
