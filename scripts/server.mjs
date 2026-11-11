@@ -16,14 +16,14 @@ export async function startServer(port = 4173) {
       response.writeHead(204).end();
       return;
     }
-    if (request.method !== "GET" || !/^\/(?:index\.html|styles\.css|(?:src|tests)\/[a-z-]+\.(?:html|js))$/.test(path)) {
+    if (request.method !== "GET" || !/^\/(?:(?:index|lab)\.html|styles\.css|(?:src|tests)\/[a-z-]+\.(?:html|js))$/.test(path)) {
       response.writeHead(404).end("Not found");
       return;
     }
 
     try {
       let file = await readFile(new URL(path.slice(1), root));
-      if (path === "/index.html") file = file.toString("utf8").replace("__SERVER_RUN_ID__", runId);
+      if (path === "/index.html" || path === "/lab.html") file = file.toString("utf8").replace("__SERVER_RUN_ID__", runId);
       const type = types[path.split(".").at(-1)];
       response.writeHead(200, { "Content-Type": type + "; charset=utf-8", "Cache-Control": "no-store" });
       response.end(file);

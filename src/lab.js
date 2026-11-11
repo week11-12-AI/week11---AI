@@ -10,19 +10,24 @@ const passiveElements = new Set([
   "g", "line", "path", "polygon", "polyline", "rect", "text", "title",
 ]);
 
-const clickTextAttribute = "data-lab-click-text";
-const clickTextPattern = /^\s*this\.textContent\s*=\s*(?:"([^"\\\r\n]*)"|'([^'\\\r\n]*)')\s*;?\s*$/;
+const clickAttribute = "data-lab-onclick";
+const legacyClickAttribute = "data-lab-click-text";
 
 function readDraft(source, doc) {
   const template = doc.createElement("template");
   template.innerHTML = source;
-  // Treat the supported button action as text data and strip inline handlers.
+  // Keep click source as serializable VDOM data. Only the actual area binds it.
   for (const node of template.content.querySelectorAll("*")) {
     if (!passiveElements.has(node.localName)) {
       node.remove();
       continue;
     }
     const inlineClick = node.getAttribute("onclick");
+    if (inlineClick !== null) node.setAttribute(clickAttribute, inlineClick);
+    else if (node.hasAttribute(legacyClickAttribute) && !node.hasAttribute(clickAttribute)) {
+      node.setAttribute(clickAttribute, `this.textContent = ${JSON.stringify(node.getAttribute(legacyClickAttribute))}`);
+    }
+    node.removeAttribute(legacyClickAttribute);
     for (const { name, value } of [...node.attributes]) {
       if (/^on/i.test(name) || /^(srcdoc|srcset|autofocus|formaction|contenteditable|tabindex|accesskey)$/i.test(name)
         || (/^(href|src|xlink:href)$/i.test(name) && /^(javascript|vbscript|data):/i.test(value.replace(/[\s\u0000-\u001f]/g, "")))) {
@@ -30,13 +35,7 @@ function readDraft(source, doc) {
       }
     }
     if (node.localName === "button") {
-      if (inlineClick !== null) {
-        const action = clickTextPattern.exec(inlineClick);
-        if (action) node.setAttribute(clickTextAttribute, action[1] ?? action[2]);
-        else node.removeAttribute(clickTextAttribute);
-      }
-      if (node.hasAttribute(clickTextAttribute)) node.setAttribute("type", "button");
-      else node.setAttribute("inert", "");
+      node.setAttribute("type", "button");
     } else if (node.matches("a, details, input, label, select, textarea")) {
       node.setAttribute("inert", "");
     }
@@ -46,8 +45,45 @@ function readDraft(source, doc) {
 
 const patchLabels = { text: "텍스트", props: "속성", insert: "추가", remove: "삭제", replace: "교체" };
 
+function editableMarkup(root) {
+  const snapshot = root.cloneNode(true);
+  for (const node of snapshot.querySelectorAll(`[${clickAttribute}]`)) {
+    node.setAttribute("onclick", node.getAttribute(clickAttribute));
+    node.removeAttribute(clickAttribute);
+  }
+  return snapshot.innerHTML;
+}
+
 export function mountLab({ actual, preview, editor, patchButton, back, forward, position, changes, storage }) {
   const doc = actual.ownerDocument;
+  const clickBindings = new WeakMap();
+
+  function bindClicks() {
+    for (const node of actualRoot.querySelectorAll("*")) {
+      const source = node.getAttribute(clickAttribute);
+      if (clickBindings.get(node) === source) continue;
+      if (source === null) {
+        if (clickBindings.has(node)) node.onclick = null;
+      } else {
+        try {
+          // Use this document's realm so alert, document and window refer to the lab.
+          const handler = new doc.defaultView.Function("event", source);
+          node.onclick = function (event) {
+            try {
+              return handler.call(this, event);
+            } catch (error) {
+              changes.textContent = `onclick 실행 오류: ${error.message}`;
+            }
+          };
+        } catch (error) {
+          node.onclick = null;
+          changes.textContent = `onclick 문법 오류: ${error.message}`;
+        }
+      }
+      clickBindings.set(node, source);
+    }
+  }
+
   let actualRoot = actual.firstElementChild;
   const initial = { tree: fromDOM(actualRoot), markup: actualRoot.innerHTML };
   const saved = storage?.read("lab");
@@ -59,6 +95,7 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
   } : undefined);
   let actualTree = history.current.tree;
   actualRoot = patch(actualRoot, diff(initial.tree, actualTree));
+  bindClicks();
   editor.value = valid && typeof saved.draft === "string" ? saved.draft : history.current.markup;
   const previewTree = editor.value === history.current.markup ? history.current.tree : readDraft(editor.value, doc);
   let previewRoot = toDOM(previewTree, doc);
@@ -96,35 +133,35 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
     updatePreview();
     save();
   });
-  actual.addEventListener("click", event => {
-    const button = event.target.closest?.(`button[${clickTextAttribute}]`);
-    if (!button || button.disabled) return;
-    event.preventDefault();
-    button.textContent = button.getAttribute(clickTextAttribute);
-    actualTree = fromDOM(actualRoot);
-  });
   patchButton.addEventListener("click", () => {
     updatePreview();
     const next = fromDOM(previewRoot);
     const historyChanges = diff(history.current.tree, next);
-    const patches = actualTree === history.current.tree ? historyChanges : diff(actualTree, next);
+    // A click handler may have changed text, attributes or children since the last Patch.
+    actualTree = fromDOM(actualRoot);
+    const patches = diff(actualTree, next);
+    observer.takeRecords();
     actualRoot = patch(actualRoot, patches);
-    if (historyChanges.length) history.push({ tree: next, markup: actualRoot.innerHTML });
+    if (historyChanges.length) history.push({ tree: next, markup: editableMarkup(actualRoot) });
     actualTree = history.current.tree;
     save();
     showChanges(patches);
+    bindClicks();
   });
 
   function travel(direction) {
     const next = history.move(direction);
     if (!next) return;
+    actualTree = fromDOM(actualRoot);
     const patches = diff(actualTree, next.tree);
+    observer.takeRecords();
     actualRoot = patch(actualRoot, patches);
     actualTree = next.tree;
     previewRoot = patch(previewRoot, diff(fromDOM(previewRoot), next.tree));
     editor.value = next.markup;
     save();
     showChanges(patches);
+    bindClicks();
   }
 
   back.addEventListener("click", () => travel(-1));
