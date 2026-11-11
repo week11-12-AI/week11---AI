@@ -1,42 +1,106 @@
-# week11-12--AI
+# Lights Out · 미니 React
 
-React, Redis, DBMS
+Vanilla JavaScript로 만든 **5×5 불 끄기 퍼즐**입니다. 기존 미니 React의 Virtual DOM·Diff·Patch와 함수형 컴포넌트·Hooks를 그대로 활용합니다. 게시판 시연을 퍼즐로 교체했으며, Phase 1 HTML 실험실은 별도 페이지로 유지합니다.
 
-## 미니 React 실습
+## 실행
 
-Vanilla JavaScript로 Virtual DOM, Diff, Patch와 루트 컴포넌트의 Hook을 구현했습니다. 같은 Diff와 Patch를 HTML 실험실과 좋아요·댓글 시연에서 사용합니다.
+Node.js가 필요합니다. 외부 패키지 설치는 필요하지 않습니다.
 
 ```powershell
 npm run dev
 ```
 
-브라우저에서 <http://127.0.0.1:4173>을 열면 됩니다. Node.js가 필요하며 npm 패키지를 설치할 필요는 없습니다.
+- 퍼즐: <http://127.0.0.1:4173>
+- VDOM 실험실: <http://127.0.0.1:4173/lab.html>
+- 종료: 터미널에서 `Ctrl+C`
+- 포트 변경: PowerShell에서 `$env:PORT=4174` 설정 후 실행
 
-### 시연 순서
+HTML 파일을 직접 여는 대신 서버 주소로 접속하세요. 실행 ID는 서버가 HTML에 넣습니다.
 
-1. **Phase 1**에서 테스트 영역의 제목을 바꾸고 목록에 항목을 넣습니다. **Patch 적용** 후 실제 영역의 변경과 `MutationObserver` 기록을 확인합니다. 뒤로가기·앞으로가기로 두 영역이 함께 복원됩니다. 뒤로 이동한 뒤 새 Patch를 적용하면 앞쪽 기록은 새 분기로 대체됩니다.
-2. **Phase 2**에서 게시물 좋아요가 10이 되면 인기 배지가 추가됩니다. 댓글은 좋아요가 많은 순으로 정렬되며, 동점이면 먼저 등록한 댓글이 앞에 옵니다. 1위 댓글의 좋아요가 10개 이상이면 **인기 댓글**이 표시됩니다. 댓글에는 등록 시간이 표시되고, **답글**로 해당 댓글 아래에 대댓글을 달 수 있습니다.
-3. **새로고침**하면 같은 브라우저에 저장한 게시물·댓글 좋아요, 댓글·대댓글과 초안, Phase 1의 적용 내용과 히스토리가 복원됩니다. `npm run dev` 서버를 종료하고 다시 실행하면 게시물 좋아요는 0, 댓글과 초안은 빈 상태, Phase 1은 처음 샘플로 돌아갑니다.
+## 게임 규칙과 기능
 
-### 코드에서 동작 따라가기
+- 칸을 클릭하면 **그 칸과 상하좌우**의 불이 반전됩니다. 대각선과 보드 밖은 영향을 받지 않습니다.
+- 불이 모두 꺼지면 성공입니다. 완료 이후 추가 클릭은 막고 되돌리기·재시작은 허용합니다.
+- **되돌리기 / 다시 실행**으로 이동 기록을 탐색합니다. 되돌린 뒤 다른 칸을 누르면 기존의 앞쪽 기록은 사라집니다.
+- **이 퍼즐 처음부터**는 같은 시작 보드로 돌아가 이동 횟수와 이력을 비웁니다.
+- **새 퍼즐 시작하기**는 새 보드로 시작합니다. 꺼진 보드에 무작위로 고른 5개의 서로 다른 칸을 누르는 방식이라 항상 풀 수 있습니다. 최소 이동 횟수를 뜻하지는 않습니다.
+- 남은 불과 현재 이동 횟수를 표시하고, 마우스를 올리거나 초점을 주면 영향을 받는 칸을 미리 보여줍니다.
+- 키보드는 `Tab`으로 진입, 방향키로 이동, `Enter` 또는 `Space`로 선택합니다. 모바일 터치도 지원합니다.
+- 새로고침 시 보드와 전체 이동 이력, 현재 위치가 복원됩니다. **서버를 재시작하면 실행 ID가 바뀌어 새 퍼즐에서 시작합니다.**
+
+저장은 같은 브라우저·같은 주소의 localStorage를 사용합니다. 서버 DB나 여러 사용자 간 실시간 공유는 없습니다. 브라우저 저장을 막은 경우에도 플레이할 수 있지만 새로고침 복원은 지원되지 않습니다. 여러 탭을 동시에 플레이하면 마지막으로 저장한 탭의 기록이 남습니다.
+
+## 미니 React와의 연결
+
+```text
+클릭 → 루트 useState 갱신 → FunctionComponent.update()
+     → useMemo로 보드와 남은 불 계산
+     → 함수형 자식 컴포넌트가 새 VDOM 반환
+     → 이전 VDOM과 Diff → 바뀐 실제 DOM만 Patch
+     → useEffect로 저장과 브라우저 탭 제목 갱신
+```
+
+| 기능 | 구현 |
+| --- | --- |
+| `useState` | 루트에서 퍼즐 이력과 미리보기 칸 관리 |
+| 함수형 자식 컴포넌트 | `LightGrid`, `GameControls`는 props만 사용 |
+| `useMemo` | 보드·남은 불·미리보기·이벤트 핸들러 계산을 캐시 |
+| `useEffect` | 게임 상태 저장, 탭 제목 변경 및 정리 |
+| VDOM·Diff·Patch | 기존 엔진을 공유하며 25개 버튼 노드를 유지 |
+| Phase 1 실험실 | 실제/테스트 영역, HTML 편집, Patch, 뒤로/앞으로, MutationObserver |
+
+모든 Hook과 State는 과제 조건에 따라 루트에서만 관리합니다. 자식에 Hook을 호출하면 오류를 냅니다. 상태 변경은 동기적으로 반영합니다. React 전체를 재현한 구현은 아니며, Batching·key 기반 재배치·Concurrent Rendering은 포함하지 않습니다.
+
+## 코드 구조
 
 | 파일 | 역할 |
 | --- | --- |
-| [`src/vdom.js`](src/vdom.js) | 실제 DOM 변환, 다섯 종류의 변경 계산, DOM 반영 |
-| [`src/history.js`](src/history.js), [`src/lab.js`](src/lab.js) | 상태 기록과 HTML 편집·복원 화면 |
-| [`src/component.js`](src/component.js) | `FunctionComponent`, `mount()`·`update()`, `useState`·`useEffect`·`useMemo` |
-| [`src/demo.js`](src/demo.js) | 루트 상태와 props만 받는 자식 컴포넌트 |
+| `src/puzzle.js` | 순수 퍼즐 규칙, 생성, 완료 판정, 이력, 저장값 검증 |
+| `src/game.js` | 루트 상태와 함수형 퍼즐 UI |
+| `src/main.js` | 게임 시작과 실행 ID에 맞는 저장소 연결 |
+| `src/component.js` | FunctionComponent와 useState/useEffect/useMemo |
+| `src/vdom.js` | DOM 변환, 텍스트·속성·삽입·삭제·교체 Diff와 Patch |
+| `src/storage.js` | 실행 ID로 구분한 브라우저 저장 |
+| `lab.html`, `src/lab-main.js`, `src/lab.js`, `src/history.js` | Phase 1 편집·미리보기·변경 이력 |
+| `scripts/server.mjs` | 개발 서버와 실행 ID 생성 |
+| `tests/browser.js` | 엔진·게임·화면·저장 회귀 테스트 |
 
-```text
-클릭 또는 입력 → 루트 상태 변경 → update() → 새 Virtual DOM → Diff → Patch → Effect 실행
+Phase 1 편집기는 HTML/SVG와 직접 작성한 `onclick` JavaScript를 지원합니다. Patch 적용 후 실제 영역에서 실행되며, 내부 버튼의 클릭은 부모 `div`로 전파됩니다. `this`, `event.currentTarget`, `event.stopPropagation()`도 사용할 수 있습니다. 코드는 실험실 페이지의 브라우저 환경에서 실행됩니다.
+
+```html
+<button onclick="alert('1234')">aaa</button>
+<div onclick="alert('부모 div 클릭')">
+  <button>내부 버튼</button>
+</div>
 ```
 
-### 테스트와 구현 범위
+`alert`가 팝업 함수이며 `onclick`의 따옴표를 닫아야 합니다. 클릭 코드는 VDOM의 문자열 속성으로 보관하고 실제 영역의 해당 요소에 연결합니다. 이벤트로 DOM이 바뀐 뒤 Patch를 눌러도 현재 DOM과 목표 VDOM을 비교해 필요한 변경만 적용합니다. 문법·실행 오류는 화면 아래에 표시됩니다.
+
+## 테스트
 
 ```powershell
 npm test
 ```
 
-Chrome 또는 Edge에서 DOM 변환·Diff·Patch·히스토리·Hook 단위 테스트와 두 Phase의 기능 테스트를 실행합니다. 브라우저가 다른 위치에 있으면 `BROWSER_PATH`에 실행 파일 경로를 지정하세요. 개발 서버를 켠 상태에서 <http://127.0.0.1:4173/tests/browser.html>로 결과를 직접 볼 수도 있습니다.
+Chrome 또는 Edge를 사용해 **30개 테스트**를 실행합니다. 브라우저가 다른 위치에 있으면 `BROWSER_PATH`를 지정하세요.
 
-과제의 제약에 따라 Hook은 루트에만 두고 상태 변경마다 동기적으로 갱신합니다. Diff는 바뀌지 않은 앞뒤 자식을 보존하고 나머지는 위치 기준으로 비교합니다. 목록의 `key` 기반 재배치와 선택 과제인 Batching은 구현 범위 밖입니다. Phase 1 편집기는 일반적인 표시용 HTML과 SVG를 미리보기로 지원합니다.
+중점 검증:
+
+- 모서리·가장자리·중앙 반전 범위와 행 경계, 같은 칸 두 번 클릭의 원상복구
+- 생성한 100개의 퍼즐이 실제 클릭으로 해결되는지
+- 완료 후 추가 클릭 방지, undo/redo 경계, 새 분기, 같은 퍼즐 재시작
+- 기존 25개 버튼의 객체 동일성, 중앙 클릭 시 5개 칸 상태만 변경
+- Hooks 의존성·cleanup·루트 제한, 미리보기 시 저장/보드 재계산 생략
+- 손상된 저장값 복구, 새로고침 이력 복원, 서버 실제 재시작 초기화
+- Phase 1의 Patch·히스토리·버튼 동작과 복원
+- 클릭 코드 변경·삭제, 부모 이벤트 전파·중단, 오류 후 수정, 텍스트만 수정할 때 DOM 노드와 이벤트 핸들러 유지
+
+서버를 켜고 <http://127.0.0.1:4173/tests/browser.html>에서도 실행할 수 있습니다. 수동 테스트는 기존 저장값을 백업하고 종료 후 복원합니다. 테스트 중에는 다른 탭에서 플레이하지 않는 것이 좋습니다.
+
+## 4분 발표 시연 예시
+
+1. 규칙을 설명하고 중앙·모서리를 클릭합니다.
+2. 되돌리기 → 다시 실행 → 되돌린 뒤 다른 칸 클릭으로 이력 분기를 보여줍니다.
+3. 새로고침해 이어지는 상태를 확인합니다.
+4. VDOM 실험실에서 제목만 수정해 Patch한 후, 같은 Diff·Patch 엔진이 퍼즐에도 사용된다는 점을 설명합니다.
+5. 핵심 테스트 결과와 실제 React 대비 구현 범위를 소개합니다.
