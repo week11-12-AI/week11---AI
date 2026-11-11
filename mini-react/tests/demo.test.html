@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>mini-react — 시연 페이지 테스트</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; }
+    .pass { color: green; }
+    .fail { color: crimson; }
+    pre { margin: 4px 0; }
+    iframe { width: 900px; height: 400px; border: 1px solid #ccc; margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <!-- 시연 페이지를 안에 띄우고, 버튼을 대신 눌러서 요구 카드대로 되는지 본다 (Live Server로 연다) -->
+  <h1 id="summary">테스트 실행 중…</h1>
+  <div id="results"></div>
+  <iframe id="demo" src="../demo.html"></iframe>
+
+  <script>
+    const results = document.getElementById("results");
+    let pass = 0, fail = 0;
+    function check(name, actual, expected) {
+      const a = JSON.stringify(actual), e = JSON.stringify(expected);
+      const ok = a === e;
+      ok ? pass++ : fail++;
+      const line = document.createElement("pre");
+      line.className = ok ? "pass" : "fail";
+      line.textContent = ok ? `✅ ${name}` : `❌ ${name}\n   기대: ${e}\n   실제: ${a}`;
+      results.appendChild(line);
+    }
+
+    document.getElementById("demo").onload = function () {
+      const d = this.contentDocument;
+      const items = () => [...d.querySelectorAll("#app li span")].map((s) => s.textContent);
+      const leftText = () => d.querySelector("#app p:last-child").firstChild.textContent;
+      const clearBtn = () => d.getElementById("clear-done");
+
+      // ── 요구 카드: "완료된 일 지우기" (11/11 진훈) ─────────────
+      // 예 1: [☑ 양치하기, ☐ 옷 입기, ☐ 카드키 챙기기] → 누름 → [옷 입기, 카드키 챙기기]
+      //       끝 조건: 남은 일 숫자는 그대로
+      const leftBefore = leftText();
+      clearBtn().click();
+      check("예 1: 완료된 일만 사라진다", items(), ["옷 입기", "카드키 챙기기"]);
+      check("예 1: 남은 일 숫자는 그대로", leftText(), leftBefore);
+
+      // 예 2: 완료된 게 하나도 없으면 버튼이 회색이라 못 누른다 (진훈 결정: 다)
+      check("예 2: 완료된 게 없으면 버튼을 못 누른다", clearBtn().disabled, true);
+
+      // ── 레드팀 (AI 공격 → 진훈 판정) ─────────────────────
+      // 1: 회색이 된 뒤 "옷 입기"를 완료 → 지울 게 생겼으니 다시 눌려야 함
+      d.querySelectorAll("#app li")[0].querySelectorAll("button")[0].click();
+      check("레드팀 1: 완료된 일이 다시 생기면 버튼이 다시 눌린다", clearBtn().disabled, false);
+
+      // 2: "남은 일만" 보기 → 화면에 완료된 일이 안 보이니 회색 (보이는 것 기준)
+      d.querySelectorAll("#app p:last-child button")[1].click();
+      check("레드팀 2: '남은 일만' 보기에서는 버튼이 회색", clearBtn().disabled, true);
+
+      // 3: 모든 항목을 완료 → 완료된 일이 있으니 눌린다 (규칙 1과 일관, 진훈 재판정 가)
+      //    → 누르면 목록이 비고, 남은 일 0개, 그다음 회색
+      d.querySelectorAll("#app p:last-child button")[0].click();           // "전부" 보기로
+      d.querySelectorAll("#app li")[1].querySelectorAll("button")[0].click(); // 카드키 챙기기 완료
+      check("레드팀 3: 모든 항목을 완료하면 버튼이 눌린다", clearBtn().disabled, false);
+      clearBtn().click();
+      check("레드팀 3: 누르면 목록이 빈다", items(), []);
+      check("레드팀 3: 남은 일 0개", leftText(), "남은 일 0개 · ");
+      check("레드팀 3: 그다음엔 회색", clearBtn().disabled, true);
+
+      document.getElementById("summary").textContent = `통과 ${pass} / 실패 ${fail}`;
+    };
+  </script>
+</body>
+</html>

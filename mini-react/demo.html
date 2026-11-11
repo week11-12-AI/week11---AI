@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <title>mini-react 시연 — 할 일 목록</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; max-width: 960px; margin: 0 auto; }
+    .row { display: flex; gap: 24px; flex-wrap: wrap; }
+    #app { flex: 1; min-width: 300px; border: 2px solid #4a7; padding: 12px; }
+    #panel { flex: 1; min-width: 300px; }
+    #panel pre { background: #f4f4f4; padding: 8px; white-space: pre-wrap; margin: 4px 0 12px; }
+    li { margin: 4px 0; }
+    li.done span { text-decoration: line-through; color: #999; }
+    button { margin-left: 4px; }
+    .on { font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h2>mini-react 시연 — 할 일 목록</h2>
+  <p>추가 / 완료 / 삭제 / 남은 일만 보기를 눌러 보세요. 오른쪽에서 Hook이 언제 돌았는지 보입니다.</p>
+
+  <div class="row">
+    <!-- 이 안의 DOM은 applyPatches만 바꾼다 -->
+    <div id="app"></div>
+
+    <!-- 관찰 패널 (VDOM 밖. useEffect가 여기에 적는다) -->
+    <div id="panel">
+      <b>Hook 기록</b>
+      <pre id="hook-log">아직 없음</pre>
+      <b>마지막 지시서 (diff 결과 = 실제로 고친 곳)</b>
+      <pre id="patch-log">아직 없음</pre>
+    </div>
+  </div>
+
+  <script src="src/main.js"></script>       <!-- Phase 1: createDom, diff, applyPatches -->
+  <script src="src/component.js"></script>  <!-- Phase 2: h, FunctionComponent, useState, useEffect, useMemo -->
+  <script>
+    let memoCalls = 0;   // useMemo가 다시 계산한 횟수
+    let effectCalls = 0; // useEffect가 실행된 횟수
+    let nextId = 4;
+
+    // ── 자식 컴포넌트: 상태 없음, 받은 props만으로 VNode를 만든다 ──────
+    function TodoItem(props) {
+      const { todo, onToggle, onRemove } = props;
+      return h("li", { class: todo.done ? "done" : "" },
+        h("span", {}, todo.text),
+        h("button", { onclick: onToggle }, todo.done ? "되돌리기" : "완료"),
+        h("button", { onclick: onRemove }, "삭제"));
+    }
+
+    function Footer(props) {
+      const { left, onlyLeft, onFilter, hasDone, onClearDone } = props;
+      // 요구 카드 예 2: 완료된 게 없으면 버튼을 회색으로 (disabled)
+      const clearProps = hasDone
+        ? { id: "clear-done", onclick: onClearDone }
+        : { id: "clear-done", disabled: "", onclick: onClearDone };
+      return h("p", {},
+        `남은 일 ${left}개 · `,
+        h("button", { class: onlyLeft ? "" : "on", onclick: () => onFilter(false) }, "전부"),
+        h("button", { class: onlyLeft ? "on" : "", onclick: () => onFilter(true) }, "남은 일만"),
+        h("button", clearProps, "완료된 일 지우기"));
+    }
+
+    // ── 루트 컴포넌트: 상태와 Hook은 여기에만 ─────────────────────
+    function App() {
+      const [todos, setTodos] = useState([
+        { id: 1, text: "양치하기", done: true },
+        { id: 2, text: "옷 입기", done: false },
+        { id: 3, text: "카드키 챙기기", done: false },
+      ]);
+      const [onlyLeft, setOnlyLeft] = useState(false);
+
+      // useMemo: todos가 그대로면 다시 세지 않는다 (필터만 바꿀 때)
+      const left = useMemo(function () {
+        memoCalls++;
+        return todos.filter((t) => !t.done).length;
+      }, [todos]);
+
+      // useEffect: 남은 개수가 바뀌었을 때만, DOM을 다 고친 뒤 탭 제목을 바꾼다
+      useEffect(function () {
+        effectCalls++;
+        document.title = `남은 일 ${left}개`;
+      }, [left]);
+
+      const shown = onlyLeft ? todos.filter((t) => !t.done) : todos;
+
+      function add() {
+        const input = document.getElementById("new-todo");
+        const text = input.value.trim();
+        if (!text) return;
+        input.value = "";
+        setTodos([...todos, { id: nextId++, text, done: false }]);
+      }
+      const toggle = (id) => setTodos(todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+      const remove = (id) => setTodos(todos.filter((t) => t.id !== id));
+      // 요구 카드 예 1: 완료된 일만 지운다 (남은 일은 그대로)
+      const clearDone = () => setTodos(todos.filter((t) => !t.done));
+      // 레드팀 2 (진훈 결정 가): "보이는 것 기준" — 화면에 완료된 일이 안 보이면 회색
+      const hasDone = shown.some((t) => t.done);
+
+      return h("div", {},
+        h("p", {},
+          h("input", { id: "new-todo", placeholder: "할 일" }),
+          h("button", { onclick: add }, "추가")),
+        h("ul", {}, shown.map((todo) =>
+          TodoItem({ todo, onToggle: () => toggle(todo.id), onRemove: () => remove(todo.id) }))),
+        Footer({ left, onlyLeft, onFilter: setOnlyLeft, hasDone, onClearDone: clearDone }));
+    }
+
+    // ── 관찰: 그릴 때마다 패널 갱신 (update를 감싸서 기록만 추가) ──────────
+    const app = new FunctionComponent(App, document.getElementById("app"));
+    const originalUpdate = app.update.bind(app);
+    app.update = function () {
+      const patches = originalUpdate();
+      // PROPS는 대부분 버튼 함수(onclick) 교체라 화면에 안 보인다 → 개수만 적는다
+      const visible = patches.filter((p) => p.op !== "PROPS");
+      const propsCount = patches.length - visible.length;
+      document.getElementById("patch-log").textContent =
+        (visible.length
+          ? visible.map((p) => `${p.op} ${JSON.stringify(p.path)}${p.value !== undefined ? ' "' + p.value + '"' : ""}`).join("\n")
+          : "(글자·노드 변경 없음)") +
+        `\n+ PROPS ${propsCount}개 (속성·버튼 함수 교체)`;
+      showHooks();
+      return patches;
+    };
+    function showHooks() {
+      document.getElementById("hook-log").textContent =
+        `useMemo 계산 횟수: ${memoCalls}\nuseEffect 실행 횟수: ${effectCalls}\n탭 제목: ${document.title}`;
+    }
+
+    app.mount();
+    showHooks();
+  </script>
+</body>
+</html>
