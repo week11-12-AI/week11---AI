@@ -10,6 +10,8 @@ Vanilla JS로 React의 핵심(Virtual DOM, diff, Hooks)을 직접 만들고 그�
 - 상태가 변했을 때, 변한 것만 업데이트한다
 - 함수 안에는 상태를 저장하지 않는다. 상태를 hooks에 두는 이유는, 컴포넌트마다 상태를 저장하기 위해서다
 
+주소창부터 화면까지의 전체 그림과 React의 자리: [docs/browser-and-react.md](docs/browser-and-react.md)
+
 ### 변한 것만 업데이트하는 흐름 (Phase 1)
 ```
 HTML 글자 ──htmlToDom──▶ DOM ──domToVNode──▶ VNode
