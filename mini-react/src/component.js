@@ -30,12 +30,14 @@ class FunctionComponent {
     this.hooks = [];            // 상태 칸. 부른 순서 = 칸 번호
     this.hookIndex = 0;         // 이번 그리기에서 몇 번째 hook인지
     this.vnode = null;          // 마지막으로 그린 VNode (diff의 "이전")
+    this.effects = [];          // 다 그린 뒤 실행할 일 목록 (useEffect가 메모해 둔 것)
   }
 
-  // 함수를 한 번 실행해서 VNode를 얻는다
+  // 함수를 한 번 실행해서 VNode를 얻는다 (= 설계도 만들기. 브라우저 렌더링과 다름)
   render() {
     currentComponent = this;
     this.hookIndex = 0;         // 매번 0번부터 다시 센다 → 같은 칸을 다시 쓴다
+    this.effects = [];          // 이번 그리기의 할 일 메모를 비운다
     try {
       return this.fn();
     } finally {
@@ -43,20 +45,29 @@ class FunctionComponent {
     }
   }
 
-  // 처음 그리기: VNode → createDom → 화면
+  // 처음 그리기: VNode → createDom → 화면 → 할 일 실행
   mount() {
     this.vnode = this.render();
     this.container.replaceChildren(createDom(this.vnode));
+    this.runEffects();          // DOM을 다 고친 뒤에
   }
 
-  // 다시 그리기: 새 VNode → diff(이전, 새) → applyPatches (바뀐 곳만)
+  // 다시 그리기: 새 VNode → diff(이전, 새) → applyPatches (바뀐 곳만) → 할 일 실행
   update() {
     const newVNode = this.render();
     const patches = diff(this.vnode, newVNode);
     applyPatches(this.container, patches);
     this.vnode = newVNode;
     this.lastPatches = patches; // 관찰용 (페이지·테스트에서 본다)
+    this.runEffects();          // DOM을 다 고친 뒤에
     return patches;
+  }
+
+  // useEffect가 메모해 둔 일을 순서대로 실행하고 비운다
+  runEffects() {
+    const todo = this.effects;
+    this.effects = [];
+    for (const effect of todo) effect();
   }
 }
 
@@ -83,4 +94,32 @@ function useState(initial) {
   };
 
   return [comp.hooks[i], setState];
+}
+
+// ─────────────────────────────────────────────
+// useEffect(할 일, 감시 목록)   ⭐ 핵심
+//   할 일은 바로 실행하지 않고 메모만 한다 → DOM을 다 고친 뒤(runEffects) 실행
+//   칸에는 "지난번 감시 목록"을 저장해 두고, 이번 목록과 비교한다
+//     - 처음(칸이 비어 있음)      → 실행
+//     - 감시 목록을 안 줬으면     → 매번 실행
+//     - 하나라도 값이 달라졌으면  → 실행
+//     - 전부 같으면              → 건너뜀
+// ─────────────────────────────────────────────
+function useEffect(effect, deps) {
+  const comp = currentComponent;
+  if (!comp) throw new Error("useEffect는 컴포넌트 함수 안에서만 부를 수 있다");
+
+  const i = comp.hookIndex; // useState와 같은 번호표를 같이 쓴다
+  comp.hookIndex++;
+
+  const prevDeps = comp.hooks[i]; // 지난번 감시 목록 (처음엔 undefined)
+  const changed =
+    prevDeps === undefined ||
+    deps === undefined ||
+    deps.some((value, k) => value !== prevDeps[k]);
+
+  if (changed) {
+    comp.hooks[i] = deps;      // 이번 감시 목록을 칸에 저장 (다음 비교용)
+    comp.effects.push(effect); // 할 일 메모
+  }
 }

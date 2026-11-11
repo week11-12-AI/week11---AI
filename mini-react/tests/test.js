@@ -268,6 +268,47 @@ check("mount: 처음 hooks = [0]", mountCounter().comp.hooks, [0]);
   check("useState 2개: 순서대로 칸 0, 1", comp.hooks, [0, "영희"]);
 }
 
+// ── Phase 2: useEffect ───────────────────────
+// 테스트용 컴포넌트: 상태 2개(count, name) + count만 감시하는 effect
+//   effect가 실행될 때마다 log에 "그때의 count / 그때 화면에 보이는 글자"를 적는다
+function mountEffectTest() {
+  const area = document.createElement("div");
+  const log = [];
+  const set = {};
+  function EffectTest() {
+    const [count, setCount] = useState(0);
+    const [name, setName] = useState("철수");
+    set.count = setCount;
+    set.name = setName;
+    useEffect(function () {
+      log.push(`count=${count} 화면=${area.firstChild.childNodes[0].textContent}`);
+    }, [count]);
+    return h("div", {}, h("p", {}, count), h("p", {}, name));
+  }
+  const comp = new FunctionComponent(EffectTest, area);
+  comp.mount();
+  return { log, set };
+}
+
+// 11/10 진훈 예측: 처음 그릴 때는 비교할 지난번이 없으니 무조건 실행
+check("useEffect: 처음 그리면 실행됨", mountEffectTest().log, ["count=0 화면=0"]);
+
+// 11/10 진훈 예측 (나): count 그대로, 이름만 바꿈 → 감시 목록 [0] vs [0] 같음 → 건너뜀
+{
+  const { log, set } = mountEffectTest();
+  set.name("영희");
+  check("useEffect: 감시 값(count) 그대로면 건너뜀", log, ["count=0 화면=0"]);
+}
+
+// count가 바뀌면 다시 실행
+// + 진훈 설명 "이펙트는 DOM이 완결되고 나서" → effect 안에서 본 화면 글자가 이미 새 값(1)이어야 한다
+{
+  const { log, set } = mountEffectTest();
+  set.count(1);
+  check("useEffect: 감시 값이 바뀌면 실행, 그때 화면은 이미 새 값",
+    log, ["count=0 화면=0", "count=1 화면=1"]);
+}
+
 // ── 재귀 호출 순서 보기 (테스트 아님, 관찰용) ─────────
 // main.js는 그대로 두고, domToVNode를 잠깐 "기록하는 함수"로 감싼다.
 // 안쪽 재귀 호출도 같은 이름(domToVNode)을 부르므로 감싼 쪽을 거친다.
