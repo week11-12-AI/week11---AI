@@ -1,0 +1,2 @@
+# WSL(리눅스)에서 make/gcc로 돌리므로 줄바꿈을 항상 LF로 둔다 (CRLF면 Makefile이 깨질 수 있음)
+* text=auto eol=lf
