@@ -67,7 +67,7 @@ int main(void) {
     run(t, "[만료5]", "SET 날씨 맑음 EX abc", "(error)");
     run(t, "[만료6]", "SET 날씨 맑음 EX -5", "(error)");
     run(t, "[만료7]", "SET 날씨 맑음 EX", "(error)");
-    /* Claude 추가 ❔ */
+    /* Claude 추가 → 진훈 11/16 판정: 4개 전부 O */
     run(t, "[만료+1]", "SET 날씨 맑음 EX 0", "(error)");      /* 0초 */
     run(t, "[만료+2]", "set 날씨 맑음 ex 2", "OK");           /* 소문자 ex */
     run(t, "[만료+3]", "SET 날씨 맑음 PX 2", "(error)");      /* 모르는 옵션 */
