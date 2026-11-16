@@ -1,3 +1,5 @@
+import { restoreTimer } from "./timer.js";
+
 export const SIZE = 5;
 export const CELL_COUNT = SIZE * SIZE;
 
@@ -54,6 +56,13 @@ export function restoreGame(value) {
     || !Array.isArray(value.moves) || !value.moves.every(validIndex)
     || !Number.isInteger(value.cursor) || value.cursor < 0 || value.cursor > value.moves.length) return null;
   const game = { version: 1, scramble: [...value.scramble], moves: [...value.moves], cursor: value.cursor };
+  if (typeof value.puzzleId === "string") game.puzzleId = value.puzzleId;
+  if (value.timer !== undefined) {
+    game.timer = restoreTimer(value.timer);
+    if (!game.timer) return null;
+  }
+  if (typeof value.attemptId === "string" && value.attemptId.length <= 100) game.attemptId = value.attemptId;
+  if (Number.isSafeInteger(value.recordId) && value.recordId > 0) game.recordId = value.recordId;
   let board = boardAt(restart(game));
   if (!board.some(Boolean)) return null;
   for (const index of game.moves) {

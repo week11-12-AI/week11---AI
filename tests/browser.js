@@ -4,6 +4,10 @@ import { StateHistory } from "../src/history.js";
 import { createRunStorage, storageKey } from "../src/storage.js";
 import { affectedCells, boardAt, createGame, play, restart, restoreGame, toggle, travel } from "../src/puzzle.js";
 import { mountGame } from "../src/game.js";
+import { CHALLENGE, createChallenge } from "../src/challenge.js";
+import { changeTimer, elapsedAt, formatSeconds } from "../src/timer.js";
+
+const lifecycle = new URLSearchParams(location.search).get("lifecycle");
 
 const tests = [];
 const test = (name, run) => tests.push({ name, run });
@@ -486,15 +490,61 @@ test("저장값 검증은 손상된 값과 완료 이후의 불가능한 기록�
   }
 });
 
-function gameFixture(value = fixture()) {
+function gameFixture(value = fixture(), api) {
   const host = document.createElement("div");
   document.body.append(host);
   const writes = [];
   const storage = { read: () => value, write: (name, game) => writes.push(JSON.parse(JSON.stringify(game))) };
-  const root = mountGame(host, storage);
+  const root = mountGame(host, storage, api);
   return { host, root, writes, $: selector => host.querySelector(selector),
     close() { root.unmount(); host.remove(); } };
 }
+
+const attemptFixture = () => ({ ...CHALLENGE, attemptId: "test-attempt", scramble: [0, 6, 12, 18, 24] });
+
+test("타이머는 경과 시간·정지·재개·저장 복원을 계산하고 잘못된 저장값을 거부한다", () => {
+  const started = changeTimer(undefined, true, 1000);
+  equal(elapsedAt(started, 3500), 2500);
+  const paused = changeTimer(started, false, 3500);
+  equal(elapsedAt(paused, 10000), 2500);
+  const resumed = changeTimer(paused, true, 10000);
+  equal(elapsedAt(resumed, 12000), 4500);
+  equal(formatSeconds(12345), "12.3초");
+  const stored = { ...fixture(), timer: resumed };
+  const restored = restoreGame(JSON.parse(JSON.stringify(stored)));
+  equal(elapsedAt(restored.timer, 12000), 4500);
+  equal(restoreGame({ ...stored, timer: { elapsedMs: -1, startedAt: null } }), null);
+});
+
+test("화면 타이머는 성공 시 멈추며 시간 갱신만으로 보드 재계산·DOM 교체·저장하지 않는다", async () => {
+  const originalNow = Date.now;
+  let now = 1000;
+  Date.now = () => now;
+  const game = gameFixture();
+  try {
+    const { $ } = game;
+    const grid = $("#light-grid"), buttons = [...grid.children];
+    $('[data-cell="0"]').click();
+    const memo = game.root.hooks.find(slot => slot.kind === "memo").value;
+    const writes = game.writes.length;
+    now = 3500;
+    await waitFor(() => $("#elapsed-time").textContent === "2.5초", game.host);
+    equal(game.root.hooks.find(slot => slot.kind === "memo").value, memo);
+    equal(game.writes.length, writes);
+    buttons.forEach((button, index) => equal(grid.children[index], button));
+    $('[data-cell="12"]').click();
+    $('[data-cell="24"]').click();
+    equal($("#remaining").textContent, "0");
+    now = 10000;
+    await new Promise(done => setTimeout(done, 120));
+    equal($("#elapsed-time").textContent, "2.5초");
+    $("#undo").click();
+    now = 11000;
+    await waitFor(() => $("#elapsed-time").textContent === "3.5초", game.host);
+    $("#restart").click();
+    equal($("#elapsed-time").textContent, "0.0초");
+  } finally { game.close(); Date.now = originalNow; }
+});
 
 test("게임은 기존 25개 버튼을 재사용하고 중앙 클릭 시 다섯 칸의 켜짐 상태만 Patch한다", () => {
   const game = gameFixture();
@@ -578,6 +628,125 @@ test("손상된 저장 데이터로도 새 퍼즐을 시작한다", () => {
   } finally { game.close(); }
 });
 
+async function waitFor(predicate, host = document.documentElement) {
+  if (predicate()) return;
+  await new Promise((done, fail) => {
+    const observer = new MutationObserver(() => {
+      if (predicate()) { clearTimeout(timer); observer.disconnect(); done(); }
+    });
+    const timer = setTimeout(() => { observer.disconnect(); fail(new Error("화면 갱신 대기 시간 초과")); }, 5000);
+    observer.observe(host, { attributes: true, childList: true, characterData: true, subtree: true });
+  });
+}
+
+test("기록 저장 실패는 오류를 보여주고 재시도할 수 있으며 입력·버튼 DOM을 보존한다", async () => {
+  let attempts = 0;
+  const api = { ranking: async () => ({ rows: [] }), finish: async () => ({ elapsedMs: 12345 }), submit: async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error("파일 저장에 실패했습니다.");
+    return { id: 1 };
+  } };
+  const attempt = attemptFixture();
+  const game = gameFixture(createChallenge(attempt), api);
+  try {
+    const { $ } = game;
+    const grid = $("#light-grid"), field = $("#record-nickname");
+    equal($("#save-record").disabled, true);
+    for (const cell of attempt.scramble) $(`[data-cell="${cell}"]`).click();
+    await waitFor(() => $("#elapsed-time").textContent === "12.3초", game.host);
+    input(field, "   ");
+    equal($("#save-record").disabled, true);
+    input(field, "테스터");
+    $("#save-record").click();
+    await waitFor(() => $("#record-status").textContent.includes("실패"), game.host);
+    equal($("#save-record").disabled, false);
+    equal($("#record-nickname"), field);
+    equal(field.value, "테스터");
+    $("#save-record").click();
+    await waitFor(() => $("#save-record").textContent === "저장 완료", game.host);
+    equal(attempts, 2);
+    equal($("#light-grid"), grid);
+    equal($("#save-record").disabled, true);
+  } finally { game.close(); }
+});
+
+test("도전 시작 실패는 기존 게임을 보존하고 성공 확인 실패는 재시도할 수 있다", async () => {
+  let finishes = 0;
+  const attempt = attemptFixture();
+  const api = { ranking: async () => ({ rows: [] }), start: async () => { throw new Error("시작 연결 실패"); },
+    finish: async () => { if (++finishes === 1) throw new Error("성공 확인 연결 실패"); return { elapsedMs: 6543 }; } };
+  const game = gameFixture(createChallenge(attempt), api);
+  try {
+    const { $ } = game;
+    const board = $("#light-grid"), before = game.writes.at(-1);
+    $("#start-challenge").click();
+    await waitFor(() => game.host.textContent.includes("시작 연결 실패"), game.host);
+    equal(game.writes.at(-1).attemptId, before.attemptId);
+    equal($("#light-grid"), board);
+    equal($("#start-challenge").disabled, false);
+    for (const cell of attempt.scramble) $(`[data-cell="${cell}"]`).click();
+    await waitFor(() => $("#retry-finish"), game.host);
+    input($("#record-nickname"), "도전자");
+    equal($("#save-record").disabled, true);
+    $("#retry-finish").click();
+    await waitFor(() => $("#save-record").disabled === false, game.host);
+    equal($("#elapsed-time").textContent, "6.5초");
+    equal($("#undo").disabled, true);
+  } finally { game.close(); }
+});
+
+// Persistent API writes are limited to the CLI's disposable test database.
+if (lifecycle === "prepare") test("공통 도전 → 실제 API 저장 → 랭킹 → 새로고침 복원까지 연결된다", async () => {
+  const challenge = await fetch("/api/challenge").then(response => response.json());
+  equal(challenge.id, CHALLENGE.id);
+  equal(challenge.title, CHALLENGE.title);
+  equal(challenge.scrambleSize, CHALLENGE.scrambleSize);
+  const frame = await loadDemo("../index.html");
+  try {
+    const $ = selector => frame.contentDocument.querySelector(selector);
+    $("#start-challenge").click();
+    await waitFor(() => $("#game-mode").textContent === CHALLENGE.title && !$("#start-challenge").disabled, frame.contentDocument.documentElement);
+    const stored = () => JSON.parse(localStorage.getItem(storageKey("puzzle"))).value;
+    const attempt = stored();
+    await waitFor(() => parseFloat($("#elapsed-time").textContent) >= 0.1, frame.contentDocument.documentElement);
+    await reloadDemo(frame);
+    equal(stored().attemptId, attempt.attemptId);
+    equal(stored().timer.startedAt, attempt.timer.startedAt);
+    const buttons = [...$("#light-grid").children];
+    for (const cell of attempt.scramble) $(`[data-cell="${cell}"]`).click();
+    equal($("#remaining").textContent, "0");
+    input($("#record-nickname"), "<b>테스터</b>");
+    await waitFor(() => !$("#save-record").disabled, frame.contentDocument.documentElement);
+    const elapsed = $("#elapsed-time").textContent;
+    await new Promise(done => setTimeout(done, 120));
+    equal($("#elapsed-time").textContent, elapsed);
+    $("#save-record").click();
+    await waitFor(() => $("#save-record").textContent === "저장 완료", frame.contentDocument.documentElement);
+    await waitFor(() => $("#ranking-list").textContent.includes("<b>테스터</b>"), frame.contentDocument.documentElement);
+    equal($("#ranking-list b"), null);
+    equal($(".rank-moves").textContent, "5회");
+    equal($(".rank-time").textContent, elapsed);
+    buttons.forEach((button, index) => equal($("#light-grid").children[index], button));
+    assert(frame.contentDocument.documentElement.scrollWidth <= frame.contentDocument.documentElement.clientWidth, "ranking mobile overflow");
+    await reloadDemo(frame);
+    await waitFor(() => $("#ranking-list").textContent.includes("<b>테스터</b>"), frame.contentDocument.documentElement);
+    equal($("#game-mode").textContent, CHALLENGE.title);
+    equal($("#remaining").textContent, "0");
+    equal($("#elapsed-time").textContent, elapsed);
+    equal($("#save-record").textContent, "저장 완료");
+    $("#start-challenge").click();
+    await waitFor(() => stored().attemptId !== attempt.attemptId && !$("#start-challenge").disabled, frame.contentDocument.documentElement);
+    const next = stored();
+    assert(boardAt(next).join(",") !== boardAt({ ...attempt, moves: [], cursor: 0 }).join(","));
+    $('[data-cell="0"]').click();
+    $("#restart").click();
+    await waitFor(() => stored().attemptId !== next.attemptId && !$("#start-challenge").disabled, frame.contentDocument.documentElement);
+    equal(stored().scramble.join(","), next.scramble.join(","));
+    equal(stored().timer.elapsedMs, 0);
+    equal($("#moves").textContent, "0");
+  } finally { frame.remove(); }
+});
+
 test("저장소는 실행 ID를 구분하고 잘못된 JSON을 안전하게 무시한다", () => {
   const key = storageKey("storage-test");
   const same = createRunStorage("run-a");
@@ -629,10 +798,13 @@ test("실제 페이지에서 새로고침 후 보드·이동 횟수·redo 기록
   } finally { frame.remove(); }
 });
 
-const lifecycle = new URLSearchParams(location.search).get("lifecycle");
 const appKeys = () => Object.keys(localStorage).filter(key => key.startsWith(storageKey("")));
 if (lifecycle === "restart") {
   tests.length = 0;
+  test("서버 재시작 후에도 DBMS에 저장한 퍼즐 랭킹은 유지된다", async () => {
+    const result = await fetch(`/api/puzzles/${CHALLENGE.id}/ranking`).then(response => response.json());
+    assert(result.rows.some(row => row.nickname === "<b>테스터</b>" && row.moves === 5 && Number.isInteger(row.elapsed_ms)));
+  });
   test("서버를 같은 주소로 재시작하면 이전 실행의 게임과 VDOM 실험 기록을 초기화한다", async () => {
     const previous = JSON.parse(localStorage.getItem(storageKey("puzzle")));
     equal(previous.value.cursor, 2);

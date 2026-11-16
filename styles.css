@@ -103,6 +103,34 @@ textarea { display: block; width: 100%; border: 1px solid #aab9c0; padding: 10px
 #results li { margin: 9px 0; }
 #results .pass { color: #236035; }
 #results .fail { color: #ae2828; }
+.side {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Challenge records use the same mini React root and DOM patch path. */
+.intro h1 { word-break: keep-all; }
+.challenge-controls { border-top: 1px solid var(--line); margin-top: 20px; padding-top: 18px; }
+.challenge-button { width: 100%; background: #e5eedd; border-color: #a7bda1; }
+.record-fields { display: flex; flex-wrap: wrap; gap: 8px; }
+.record-fields input { flex: 1 1 140px; min-width: 0; width: 100%; padding: 10px 12px; border: 1px solid #aab9c0; border-radius: 9px; font: inherit; }
+.record-fields .button { flex: 1 1 140px; }
+.record-form label { font-size: .78rem; }
+.api-error { color: #a12828; font-size: .8rem; line-height: 1.7; margin-top: 10px; }
+.ranking-panel { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 16px; padding: clamp(18px, 4vw, 28px); min-width: 0; }
+.ranking-panel h2 { font-size: 1.3rem; letter-spacing: -.04em; }
+.button.compact { font-size: .73rem; min-height: 36px; padding: 7px 10px; }
+.ranking-list { list-style: none; padding: 0; margin: 16px 0 0; }
+.ranking-list li { display: flex; align-items: center; gap: 16px; padding: 13px 4px; border-top: 1px solid var(--line); }
+.rank-number { color: var(--muted); font: .8rem ui-monospace, monospace; }
+.rank-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: .88rem; }
+.rank-moves { font-weight: 700; white-space: nowrap; }
+.rank-result { display: flex; align-items: flex-end; flex-direction: column; gap: 3px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+.rank-time { color: var(--muted); font-size: .77rem; white-space: nowrap; }
+.stats > .time-stat { grid-column: 1 / -1; display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-left: 0; border-top: 1px solid var(--line); padding: 14px 0 0; margin-top: 18px; }
+.stats .time-stat strong { font-size: 1.55rem; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+#retry-finish { display: block; margin-top: 8px; }
 
 @media (max-width: 720px) {
   .wrap { width: min(100% - 32px, 520px); }

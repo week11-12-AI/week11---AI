@@ -3,7 +3,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/server.mjs",
-    "test": "node scripts/test.mjs"
+    "dev": "node scripts/python.mjs server.py",
+    "test": "node scripts/python.mjs -m scripts.test",
+    "test:dbms": "node scripts/python.mjs -m unittest discover -s tests -p test_dbms.py -v",
+    "test:browser": "node scripts/python.mjs -m scripts.test_browser",
+    "benchmark:dbms": "node scripts/python.mjs -m scripts.benchmark_dbms"
   }
 }
