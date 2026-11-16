@@ -14,7 +14,13 @@ build/test_command: tests/test_command.c src/command.c src/command.h src/hashtab
 	mkdir -p build
 	$(CC) $(CFLAGS) -o $@ tests/test_command.c src/command.c src/hashtable.c
 
+server: build/server
+
+build/server: src/server.c src/command.c src/command.h src/hashtable.c src/hashtable.h
+	mkdir -p build
+	$(CC) $(CFLAGS) -o $@ src/server.c src/command.c src/hashtable.c
+
 clean:
 	rm -rf build
 
-.PHONY: test clean
+.PHONY: test server clean
