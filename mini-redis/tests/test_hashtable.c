@@ -121,7 +121,40 @@ static void test_zero_buckets(void) {
     check_int("[엣지] ht_create(0)은 NULL", ht_create(0) == NULL, 1);
 }
 
+/* 8. 계단 4 만료: 가짜 시계로 기다리지 않고 시간을 흘린다 */
+static long long fake_now = 1000000;
+static long long fake_clock(void) {
+    return fake_now;
+}
+
+static void test_expire(void) {
+    ht_now_ms = fake_clock;
+    hashtable *t = ht_create(1);
+
+    ht_set_ex(t, "날씨", "맑음", 2000);                 /* 2초 뒤 만료 */
+    check_str("[만료] 바로 get", ht_get(t, "날씨"), "맑음");
+    fake_now += 1999;
+    check_str("[만료] 1.999초 뒤 get", ht_get(t, "날씨"), "맑음");
+    fake_now += 1;
+    check_str("[만료] 딱 2초 뒤 get", ht_get(t, "날씨"), NULL);
+    check_int("[만료]   get이 엔트리를 지웠나 (체인 길이)", chain_length(t, 0), 0);
+
+    ht_set_ex(t, "날씨", "비", 2000);
+    fake_now += 3000;
+    check_int("[만료] 만료된 key del", ht_del(t, "날씨"), 0);
+
+    ht_set_ex(t, "날씨", "눈", 2000);
+    ht_set(t, "날씨", "흐림");                          /* EX 없이 덮어쓰기 → 만료 사라짐 */
+    fake_now += 3000;
+    check_str("[만료] EX 없이 덮어쓴 뒤 3초 get", ht_get(t, "날씨"), "흐림");
+
+    check_int("[만료] ttl 0은 거절", ht_set_ex(t, "a", "1", 0), -1);
+
+    ht_free(t);
+}
+
 int main(void) {
+    test_expire();
     test_jinhoon_expectation();
     test_delete_positions();
     test_overwrite_keeps_one();

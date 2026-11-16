@@ -22,7 +22,14 @@ static void run(hashtable *t, const char *label, const char *line, const char *e
     free(reply);
 }
 
+/* 계단 4: 가짜 시계 (기다리지 않고 시간을 흘린다) */
+static long long fake_now = 1000000;
+static long long fake_clock(void) {
+    return fake_now;
+}
+
 int main(void) {
+    ht_now_ms = fake_clock;
     hashtable *t = ht_create(16);
 
     /* 진훈 기대값 (11/14), 위에서부터 순서대로 */
@@ -48,6 +55,23 @@ int main(void) {
     run(t, "[추가8]", "", "(error)");                        /* 빈 줄 */
     run(t, "[추가9]", "SET 날씨", "(error)");                 /* value 없음 */
     run(t, "[추가10]", "GET a\r\n", "b");                    /* 네트워크 줄 끝 */
+
+    /* 계단 4 진훈 기대값 (11/16) */
+    run(t, "[만료1]", "SET 날씨 맑음 EX 2", "OK");
+    run(t, "[만료2]", "GET 날씨", "맑음");
+    fake_now += 3000;                                         /* 3초 흐름 */
+    run(t, "[만료3]", "GET 날씨", "(nil)");
+    run(t, "[만료4a]", "SET 날씨 비 EX 2", "OK");
+    fake_now += 3000;
+    run(t, "[만료4]", "DEL 날씨", "0");
+    run(t, "[만료5]", "SET 날씨 맑음 EX abc", "(error)");
+    run(t, "[만료6]", "SET 날씨 맑음 EX -5", "(error)");
+    run(t, "[만료7]", "SET 날씨 맑음 EX", "(error)");
+    /* Claude 추가 ❔ */
+    run(t, "[만료+1]", "SET 날씨 맑음 EX 0", "(error)");      /* 0초 */
+    run(t, "[만료+2]", "set 날씨 맑음 ex 2", "OK");           /* 소문자 ex */
+    run(t, "[만료+3]", "SET 날씨 맑음 PX 2", "(error)");      /* 모르는 옵션 */
+    run(t, "[만료+4]", "SET 날씨 맑음 EX 2 3", "(error)");    /* 인자 너무 많음 */
 
     ht_free(t);
     printf("\n%d 통과, %d 실패\n", passed, failed);

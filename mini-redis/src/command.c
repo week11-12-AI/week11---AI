@@ -59,6 +59,28 @@ static int split(char *s, char *argv[], int max) {
     return argc;
 }
 
+/* 계단 4: EX 뒤의 초를 읽는다. 1 이상 10억 이하의 정수 글자만 받는다. 성공 0, 아니면 -1 */
+static int parse_seconds(const char *s, long long *out) {
+    if (*s == '\0') {
+        return -1;
+    }
+    long long n = 0;
+    for (; *s != '\0'; s++) {
+        if (*s < '0' || *s > '9') {
+            return -1;                 /* 숫자가 아닌 글자 ("abc", "-5", "1.5") */
+        }
+        n = n * 10 + (*s - '0');
+        if (n > 1000000000LL) {
+            return -1;                 /* 너무 큼 (밀리초로 바꿀 때 넘치지 않게) */
+        }
+    }
+    if (n == 0) {
+        return -1;
+    }
+    *out = n;
+    return 0;
+}
+
 /* 대소문자 안 가리고 같은 단어인가 */
 static int same_word(const char *a, const char *b) {
     while (*a != '\0' && *b != '\0') {
@@ -100,12 +122,21 @@ char *execute_line(hashtable *t, const char *line) {
             reply = "(error) key가 없음";
         } else if (argc < 3) {
             reply = "(error) value가 없음";
-        } else if (argc > 3) {
+        } else if (argc > 5) {
             reply = "(error) 인자가 너무 많음";
-        } else if (ht_set(t, argv[1], argv[2]) != 0) {
-            reply = "(error) 메모리 부족";
-        } else {
-            reply = "OK";
+        } else if (argc == 3) {                               /* SET key value */
+            reply = ht_set(t, argv[1], argv[2]) == 0 ? "OK" : "(error) 메모리 부족";
+        } else if (!same_word(argv[3], "EX")) {               /* SET key value ??? */
+            reply = "(error) 모르는 옵션";
+        } else {                                              /* SET key value EX 초 */
+            long long sec;
+            if (argc < 5 || parse_seconds(argv[4], &sec) != 0) {
+                reply = "(error) 만료 시간이 잘못됨";
+            } else if (ht_set_ex(t, argv[1], argv[2], sec * 1000) != 0) {
+                reply = "(error) 메모리 부족";
+            } else {
+                reply = "OK";
+            }
         }
     } else if (same_word(argv[0], "GET")) {
         if (argc < 2) {
