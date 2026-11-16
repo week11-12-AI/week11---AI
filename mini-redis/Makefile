@@ -20,7 +20,19 @@ build/server: src/server.c src/command.c src/command.h src/hashtable.c src/hasht
 	mkdir -p build
 	$(CC) $(CFLAGS) -o $@ src/server.c src/command.c src/hashtable.c
 
+# 계단 5: 느린 API 서버(가짜 원본)와 APP(성능 비교)
+slow_api: build/slow_api
+bench: build/bench
+
+build/slow_api: src/slow_api.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -o $@ src/slow_api.c
+
+build/bench: src/bench.c
+	mkdir -p build
+	$(CC) $(CFLAGS) -o $@ src/bench.c
+
 clean:
 	rm -rf build
 
-.PHONY: test server clean
+.PHONY: test server slow_api bench clean

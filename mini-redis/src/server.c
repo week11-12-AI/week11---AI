@@ -38,12 +38,20 @@ static int write_all(int fd, const char *s, size_t len) {
     return 0;
 }
 
-/* ④ 답 한 줄 보내기: 답 + "\r\n" */
+/* ④ 답 한 줄 보내기: 답 + "\r\n"을 한 번에.
+ * 계단 5 측정에서 발견: 두 번에 나눠 쓰면 둘째 조각을 OS가 붙잡아 둬서 요청마다 약 40 ms가 늘었다
+ * (서버 쪽 Nagle 알고리즘 + APP 쪽 delayed ACK) */
 static int send_line(int fd, const char *reply) {
-    if (write_all(fd, reply, strlen(reply)) != 0) {
+    size_t len = strlen(reply);
+    char *msg = malloc(len + 2);
+    if (msg == NULL) {
         return -1;
     }
-    return write_all(fd, "\r\n", 2);
+    memcpy(msg, reply, len);
+    memcpy(msg + len, "\r\n", 2);
+    int r = write_all(fd, msg, len + 2);
+    free(msg);
+    return r;
 }
 
 /* 안쪽 루프: 한 APP과 연결이 유지되는 동안 ②③④⑤를 돈다.
