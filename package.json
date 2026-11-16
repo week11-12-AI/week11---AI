@@ -3,6 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "redis": "node scripts/python.mjs -m mini_redis.server",
+    "test:redis": "node scripts/python.mjs -m unittest discover -s tests -p test_redis.py -v",
+    "benchmark:redis": "node scripts/python.mjs -m scripts.benchmark_redis",
     "dev": "node scripts/python.mjs server.py",
     "test": "node scripts/python.mjs -m scripts.test",
     "test:dbms": "node scripts/python.mjs -m unittest discover -s tests -p test_dbms.py -v",

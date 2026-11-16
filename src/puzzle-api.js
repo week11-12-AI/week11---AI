@@ -17,6 +17,7 @@ export function createPuzzleAPI() {
   }
   return {
     start: (restartAttemptId) => request("/api/challenge/start", { method: "POST", body: JSON.stringify({ restartAttemptId }) }),
+    begin: attemptId => request("/api/challenge/begin", { method: "POST", body: JSON.stringify({ attemptId }) }),
     finish: body => request("/api/challenge/finish", { method: "POST", body: JSON.stringify(body) }),
     ranking: () => request(`/api/puzzles/${CHALLENGE.id}/ranking`),
     submit: body => request("/api/records", { method: "POST", body: JSON.stringify(body) }),

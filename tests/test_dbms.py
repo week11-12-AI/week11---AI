@@ -306,7 +306,12 @@ class ParserAndIndexTests(unittest.TestCase):
         now = [100.0]
         registry = ChallengeAttempts(clock=lambda: now[0])
         attempt = registry.start()
+        now[0] += 60  # Waiting for the first click is excluded.
+        with self.assertRaises(DBError):
+            registry.finish(attempt["attemptId"], attempt["scramble"])
+        self.assertEqual(registry.begin(attempt["attemptId"])["elapsedMs"], 0)
         now[0] += 12.345
+        self.assertEqual(registry.begin(attempt["attemptId"])["elapsedMs"], 12345)
         first = registry.finish(attempt["attemptId"], attempt["scramble"])
         self.assertEqual(first["elapsedMs"], 12345)
         now[0] += 50
@@ -398,6 +403,7 @@ class APITests(unittest.TestCase):
         now = [1000.0]
         self.server.api.attempts.clock = lambda: now[0]
         _, attempt = self.call("/api/challenge/start", {})
+        self.assertEqual(self.call("/api/challenge/begin", dict(attemptId=attempt["attemptId"]))[0], 200)
         common = dict(puzzleId=CHALLENGE["id"], attemptId=attempt["attemptId"], nickname="7회")
         self.assertEqual(self.call("/api/records", common)[0], 409)
         self.assertEqual(self.call("/api/challenge/finish", dict(attemptId=attempt["attemptId"], moves=[0]))[0], 400)
@@ -414,6 +420,7 @@ class APITests(unittest.TestCase):
         self.assertEqual(self.server.db.stats()["tables"]["records"]["count"], 1)
         for i in range(12):
             _, attempt = self.call("/api/challenge/start", {})
+            self.assertEqual(self.call("/api/challenge/begin", dict(attemptId=attempt["attemptId"]))[0], 200)
             now[0] += 20 - i // 2  # Equal move counts: shorter time, then earlier record.
             self.call("/api/challenge/finish", dict(attemptId=attempt["attemptId"], moves=attempt["scramble"]))
             self.assertEqual(self.call("/api/records", dict(puzzleId=CHALLENGE["id"], attemptId=attempt["attemptId"], nickname=f"tester{i}"))[0], 201)
@@ -426,6 +433,66 @@ class APITests(unittest.TestCase):
         self.assertEqual([row["nickname"] for row in result["rows"]], [f"tester{i}" for i in (10, 11, 8, 9, 6, 7, 4, 5, 2, 3)])
         self.assertEqual(result["rows"][0]["elapsed_ms"], 15000)
 
+    def finished_record(self, nickname, seconds, extra_moves=False):
+        now = [1000.0]
+        self.server.api.attempts.clock = lambda: now[0]
+        _, attempt = self.call("/api/challenge/start", {})
+        self.call("/api/challenge/begin", dict(attemptId=attempt["attemptId"]))
+        now[0] += seconds
+        moves = ([1, 1] if extra_moves else []) + attempt["scramble"]
+        self.assertEqual(self.call("/api/challenge/finish", dict(attemptId=attempt["attemptId"], moves=moves))[0], 200)
+        return dict(puzzleId=CHALLENGE["id"], attemptId=attempt["attemptId"], nickname=nickname)
+
+    def test_same_name_keeps_best_whole_record_and_survives_restart(self):
+        first = self.call("/api/records", self.finished_record(" 동일 이름 ", 1, True))[1]
+        self.assertEqual(first["outcome"], "inserted")
+        improved = self.call("/api/records", self.finished_record("동일 이름", 10))[1]
+        self.assertEqual((improved["id"], improved["moves"], improved["elapsedMs"], improved["outcome"]),
+                         (first["id"], 5, 10000, "improved"))
+        faster = self.call("/api/records", self.finished_record("동일 이름", 5))[1]
+        self.assertEqual(faster["elapsedMs"], 5000)
+        for seconds, extra in [(6, False), (5, False), (1, True)]:
+            body = self.finished_record("동일 이름", seconds, extra)
+            kept = self.call("/api/records", body)[1]
+            self.assertEqual((kept["id"], kept["moves"], kept["elapsedMs"], kept["outcome"]),
+                             (first["id"], 5, 5000, "kept"))
+            self.assertEqual(self.call("/api/records", body)[1], kept)
+        self.assertEqual(self.server.db.stats()["tables"]["records"]["count"], 1)
+        self.stop()
+        self.start()
+        rows = self.call(f"/api/puzzles/{CHALLENGE['id']}/ranking")[1]["rows"]
+        self.assertEqual([(r["nickname"], r["moves"], r["elapsed_ms"]) for r in rows], [("동일 이름", 5, 5000)])
+
+    def test_parallel_same_name_and_failed_improvement_retry(self):
+        bodies = [self.finished_record("동시 등록", seconds) for seconds in range(1, 9)]
+        with concurrent.futures.ThreadPoolExecutor(8) as pool:
+            results = list(pool.map(lambda body: self.call("/api/records", body), bodies))
+        self.assertTrue(all(status == 201 for status, _ in results))
+        self.assertEqual(len({result["id"] for _, result in results}), 1)
+        self.assertEqual(self.server.db.stats()["tables"]["records"]["count"], 1)
+        body = self.finished_record("동시 등록", 0.5)
+        with patch.object(self.server.db.journal, "append", side_effect=DBError("DB_IO", "저장 실패", 503)):
+            self.assertEqual(self.call("/api/records", body)[0], 503)
+        self.assertEqual(self.call(f"/api/puzzles/{CHALLENGE['id']}/ranking")[1]["rows"][0]["elapsed_ms"], 1000)
+        self.assertEqual(self.call("/api/records", body)[1]["elapsedMs"], 500)
+        self.assertEqual(self.server.db.stats()["tables"]["records"]["count"], 1)
+
+    def test_legacy_duplicate_names_are_grouped_before_top_ten(self):
+        sql = "INSERT INTO records (puzzle_id,nickname,moves,elapsed_ms,created_at) VALUES (?, ?, ?, ?, ?)"
+        for i in range(15):
+            self.server.db.query(sql, [CHALLENGE["id"], "중복", 5, 15000 - i * 1000, "2026-11-16T00:00:00Z"])
+        for i in range(12):
+            self.server.db.query(sql, [CHALLENGE["id"], f"이름{i}", 7, 1000 + i, "2026-11-16T00:00:00Z"])
+        self.server.db.query(sql, [CHALLENGE["id"], "미측정", 5, None, "2026-11-16T00:00:00Z"])
+        self.assertEqual(self.call("/api/records", self.finished_record("미측정", 2))[1]["outcome"], "improved")
+        rows = self.call(f"/api/puzzles/{CHALLENGE['id']}/ranking")[1]["rows"]
+        self.assertEqual(len(rows), 10)
+        self.assertEqual(len({row["nickname"] for row in rows}), 10)
+        self.assertEqual((rows[0]["nickname"], rows[0]["elapsed_ms"]), ("중복", 1000))
+        count = self.server.db.stats()["tables"]["records"]["count"]
+        self.assertEqual(self.call("/api/records", self.finished_record("중복", 0.5))[1]["outcome"], "improved")
+        self.assertEqual(self.server.db.stats()["tables"]["records"]["count"], count)
+
     def test_old_records_are_preserved_with_unmeasured_time(self):
         original = (Path(__file__).parent / "fixtures" / "legacy-js.jsonl").read_bytes()
         self.stop()
@@ -435,6 +502,7 @@ class APITests(unittest.TestCase):
         self.assertEqual(ranking["rows"][0]["nickname"], "JS 기록")
         self.assertIsNone(ranking["rows"][0]["elapsed_ms"])
         _, attempt = self.call("/api/challenge/start", {})
+        self.assertEqual(self.call("/api/challenge/begin", dict(attemptId=attempt["attemptId"]))[0], 200)
         self.call("/api/challenge/finish", dict(attemptId=attempt["attemptId"], moves=attempt["scramble"]))
         self.call("/api/records", dict(puzzleId=CHALLENGE["id"], attemptId=attempt["attemptId"], nickname="측정 기록"))
         _, ranking = self.call(f"/api/puzzles/{CHALLENGE['id']}/ranking")

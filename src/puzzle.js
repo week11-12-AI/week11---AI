@@ -63,6 +63,7 @@ export function restoreGame(value) {
   }
   if (typeof value.attemptId === "string" && value.attemptId.length <= 100) game.attemptId = value.attemptId;
   if (Number.isSafeInteger(value.recordId) && value.recordId > 0) game.recordId = value.recordId;
+  if (["inserted", "improved", "kept"].includes(value.recordOutcome)) game.recordOutcome = value.recordOutcome;
   let board = boardAt(restart(game));
   if (!board.some(Boolean)) return null;
   for (const index of game.moves) {

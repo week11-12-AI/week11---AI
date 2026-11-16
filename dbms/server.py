@@ -71,7 +71,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError:
                 raise DBError("URL", "올바른 URL이 필요합니다.") from None
             if path.startswith("/api/"):
-                body = self._body() if self.command == "POST" else None
+                body = self._body() if self.command in ("POST", "PUT", "DELETE") else None
                 status, result = self.server.api.handle(self.command, path, body)
                 self._send(status, result)
                 return
@@ -111,7 +111,7 @@ class PoolHTTPServer(HTTPServer):
     allow_reuse_address = True
     request_queue_size = 128
 
-    def __init__(self, address, db, workers=4, max_queue=128):
+    def __init__(self, address, db, workers=4, max_queue=128, api_factory=API):
         check(type(workers) is int and 1 <= workers <= 16, "POOL_SIZE", "Worker 수는 1~16입니다.")
         super().__init__(address, Handler)
         self.db, self.run_id = db, str(uuid4())
@@ -122,7 +122,7 @@ class PoolHTTPServer(HTTPServer):
         self._threads = set()
         self._executor = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="dbms-http")
         self._closed = False
-        self.api = API(db, self.pool_stats)
+        self.api = api_factory(db, self.pool_stats)
 
     def get_request(self):
         request, address = super().get_request()

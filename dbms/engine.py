@@ -151,9 +151,11 @@ class Database:
                 changes.append(dict(type="put", id=row["id"], row=row))
         return dict(table=ast["table"], changes=changes, nextId=next_id, version=table.version + 1), table.version
 
-    def _snapshot(self, ast):
+    def _snapshot(self, ast, unique_by=None):
         # Only index traversal is protected. File I/O happens outside this lock.
         table = self._table(ast["table"])
+        if unique_by is not None:
+            self._columns(ast["table"], [unique_by])
         if ast["columns"] != ["*"]:
             self._columns(ast["table"], ast["columns"])
         self._columns(ast["table"], [item["column"] for item in ast["order"]])
@@ -191,6 +193,14 @@ class Database:
                 if len(records) == limit:
                     break
             else:
+                # Keep the best row per group before LIMIT, including legacy duplicates.
+                if unique_by is not None:
+                    duplicate = next((i for i, item in enumerate(records)
+                                      if item.row[unique_by] == record.row[unique_by]), None)
+                    if duplicate is not None:
+                        if compare(records[duplicate], record) <= 0:
+                            continue
+                        records.pop(duplicate)
                 low, high = 0, len(records)
                 while low < high:
                     middle = (low + high) // 2
@@ -205,12 +215,12 @@ class Database:
         self.metrics["reads"] += 1
         return records, dict(version=table.version, plan=plan, scanned=scanned)
 
-    def execute(self, ast, expected_version=MISSING):
+    def execute(self, ast, expected_version=MISSING, *, unique_by=None):
         with self._operation():
             check(expected_version is MISSING or (type(expected_version) is int and expected_version >= 0), "DB_VERSION", "expectedVersion은 0 이상의 정수여야 합니다.")
             if ast["type"] == "select":
                 with self._state_lock:
-                    records, metadata = self._snapshot(ast)
+                    records, metadata = self._snapshot(ast, unique_by)
                 rows = [compatible_row(ast["table"], row) for row in self.journal.read_rows(records)]
                 return {**metadata, "rows": rows if ast["columns"] == ["*"] else [{column: row[column] for column in ast["columns"]} for row in rows]}
             check(ast["type"] in ("insert", "update", "delete"), "SQL_UNSUPPORTED", "지원하지 않는 명령입니다.")

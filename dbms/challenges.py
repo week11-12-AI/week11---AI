@@ -45,7 +45,7 @@ class ChallengeAttempts:
 
     def _prune(self):
         now = self.clock()
-        self.attempts = {key: value for key, value in self.attempts.items() if now - value["started"] < ATTEMPT_TTL}
+        self.attempts = {key: value for key, value in self.attempts.items() if now - value["created"] < ATTEMPT_TTL}
 
     def _find(self, attempt_id):
         self._prune()
@@ -67,13 +67,24 @@ class ChallengeAttempts:
                         self.last_board = board
                         break
             attempt_id = uuid4().hex
-            self.attempts[attempt_id] = dict(scramble=scramble, started=self.clock(), solution=None, elapsed_ms=None, record=None)
+            self.attempts[attempt_id] = dict(scramble=scramble, created=self.clock(), started=None, solution=None, elapsed_ms=None, record=None)
             return {**CHALLENGE, "attemptId": attempt_id, "scramble": list(scramble)}
+
+    def begin(self, attempt_id):
+        with self.lock:
+            attempt = self._find(attempt_id)
+            if attempt["started"] is None:
+                attempt["started"] = self.clock()
+            elapsed = attempt["elapsed_ms"]
+            if elapsed is None:
+                elapsed = max(0, round((self.clock() - attempt["started"]) * 1000))
+            return dict(attemptId=attempt_id, elapsedMs=elapsed)
 
     def finish(self, attempt_id, moves):
         with self.lock:
             attempt = self._find(attempt_id)
             validate_solution(moves, attempt["scramble"])
+            check(attempt["started"] is not None, "NOT_STARTED", "먼저 보드를 클릭해 시간 측정을 시작하세요.", 409)
             if attempt["solution"] is not None:
                 check(moves == attempt["solution"], "ATTEMPT_FINISHED", "이미 완료한 도전입니다. 다시 시작해서 도전하세요.", 409)
             else:

@@ -641,7 +641,7 @@ async function waitFor(predicate, host = document.documentElement) {
 
 test("기록 저장 실패는 오류를 보여주고 재시도할 수 있으며 입력·버튼 DOM을 보존한다", async () => {
   let attempts = 0;
-  const api = { ranking: async () => ({ rows: [] }), finish: async () => ({ elapsedMs: 12345 }), submit: async () => {
+  const api = { begin: async () => ({ elapsedMs: 0 }), ranking: async () => ({ rows: [] }), finish: async () => ({ elapsedMs: 12345 }), submit: async () => {
     attempts += 1;
     if (attempts === 1) throw new Error("파일 저장에 실패했습니다.");
     return { id: 1 };
@@ -652,7 +652,9 @@ test("기록 저장 실패는 오류를 보여주고 재시도할 수 있으며 
     const { $ } = game;
     const grid = $("#light-grid"), field = $("#record-nickname");
     equal($("#save-record").disabled, true);
-    for (const cell of attempt.scramble) $(`[data-cell="${cell}"]`).click();
+    $(`[data-cell="${attempt.scramble[0]}"]`).click();
+    await waitFor(() => $("#moves").textContent === "1", game.host);
+    for (const cell of attempt.scramble.slice(1)) $(`[data-cell="${cell}"]`).click();
     await waitFor(() => $("#elapsed-time").textContent === "12.3초", game.host);
     input(field, "   ");
     equal($("#save-record").disabled, true);
@@ -670,10 +672,38 @@ test("기록 저장 실패는 오류를 보여주고 재시도할 수 있으며 
   } finally { game.close(); }
 });
 
+test("최고 기록 갱신·유지 결과가 표시되고 저장 상태 복원 후에도 유지된다", async () => {
+  for (const [outcome, message] of [["improved", "최고 기록을 갱신했어요."], ["kept", "기존 최고 기록을 유지했어요."]]) {
+    const attempt = attemptFixture();
+    const api = { begin: async () => ({ elapsedMs: 0 }), ranking: async () => ({ rows: [] }),
+      finish: async () => ({ elapsedMs: 1000 }), submit: async () => ({ id: 1, outcome }) };
+    const game = gameFixture(createChallenge(attempt), api);
+    let stored;
+    try {
+      const { $ } = game;
+      $(`[data-cell="${attempt.scramble[0]}"]`).click();
+      await waitFor(() => $("#moves").textContent === "1", game.host);
+      for (const cell of attempt.scramble.slice(1)) $(`[data-cell="${cell}"]`).click();
+      input($("#record-nickname"), "같은 이름");
+      await waitFor(() => !$("#save-record").disabled, game.host);
+      $("#save-record").click();
+      await waitFor(() => $("#record-status").textContent === message, game.host);
+      stored = game.writes.at(-1);
+    } finally { game.close(); }
+    const restored = gameFixture(stored, api);
+    try { equal(restored.$("#record-status").textContent, message); }
+    finally { restored.close(); }
+  }
+});
+
 test("도전 시작 실패는 기존 게임을 보존하고 성공 확인 실패는 재시도할 수 있다", async () => {
   let finishes = 0;
+  let begins = 0;
   const attempt = attemptFixture();
-  const api = { ranking: async () => ({ rows: [] }), start: async () => { throw new Error("시작 연결 실패"); },
+  const api = { begin: async () => {
+    if (++begins === 1) throw new Error("측정 연결 실패");
+    return { elapsedMs: 0 };
+  }, ranking: async () => ({ rows: [] }), start: async () => { throw new Error("시작 연결 실패"); },
     finish: async () => { if (++finishes === 1) throw new Error("성공 확인 연결 실패"); return { elapsedMs: 6543 }; } };
   const game = gameFixture(createChallenge(attempt), api);
   try {
@@ -684,7 +714,13 @@ test("도전 시작 실패는 기존 게임을 보존하고 성공 확인 실패
     equal(game.writes.at(-1).attemptId, before.attemptId);
     equal($("#light-grid"), board);
     equal($("#start-challenge").disabled, false);
-    for (const cell of attempt.scramble) $(`[data-cell="${cell}"]`).click();
+    $(`[data-cell="${attempt.scramble[0]}"]`).click();
+    await waitFor(() => game.host.textContent.includes("측정 연결 실패"), game.host);
+    equal($("#moves").textContent, "0");
+    equal(game.writes.at(-1).timer.startedAt, null);
+    $(`[data-cell="${attempt.scramble[0]}"]`).click();
+    await waitFor(() => $("#moves").textContent === "1", game.host);
+    for (const cell of attempt.scramble.slice(1)) $(`[data-cell="${cell}"]`).click();
     await waitFor(() => $("#retry-finish"), game.host);
     input($("#record-nickname"), "도전자");
     equal($("#save-record").disabled, true);
@@ -708,12 +744,20 @@ if (lifecycle === "prepare") test("공통 도전 → 실제 API 저장 → 랭�
     await waitFor(() => $("#game-mode").textContent === CHALLENGE.title && !$("#start-challenge").disabled, frame.contentDocument.documentElement);
     const stored = () => JSON.parse(localStorage.getItem(storageKey("puzzle"))).value;
     const attempt = stored();
+    await new Promise(done => setTimeout(done, 150));
+    equal($("#elapsed-time").textContent, "0.0초");
+    equal(stored().timer.startedAt, null);
+    await reloadDemo(frame);
+    equal($("#elapsed-time").textContent, "0.0초");
+    $(`[data-cell="${attempt.scramble[0]}"]`).click();
+    await waitFor(() => $("#moves").textContent === "1" && !$("#start-challenge").disabled, frame.contentDocument.documentElement);
+    const startedAt = stored().timer.startedAt;
     await waitFor(() => parseFloat($("#elapsed-time").textContent) >= 0.1, frame.contentDocument.documentElement);
     await reloadDemo(frame);
     equal(stored().attemptId, attempt.attemptId);
-    equal(stored().timer.startedAt, attempt.timer.startedAt);
+    equal(stored().timer.startedAt, startedAt);
     const buttons = [...$("#light-grid").children];
-    for (const cell of attempt.scramble) $(`[data-cell="${cell}"]`).click();
+    for (const cell of attempt.scramble.slice(1)) $(`[data-cell="${cell}"]`).click();
     equal($("#remaining").textContent, "0");
     input($("#record-nickname"), "<b>테스터</b>");
     await waitFor(() => !$("#save-record").disabled, frame.contentDocument.documentElement);
@@ -739,10 +783,12 @@ if (lifecycle === "prepare") test("공통 도전 → 실제 API 저장 → 랭�
     const next = stored();
     assert(boardAt(next).join(",") !== boardAt({ ...attempt, moves: [], cursor: 0 }).join(","));
     $('[data-cell="0"]').click();
+    await waitFor(() => $("#moves").textContent === "1" && !$("#restart").disabled, frame.contentDocument.documentElement);
     $("#restart").click();
     await waitFor(() => stored().attemptId !== next.attemptId && !$("#start-challenge").disabled, frame.contentDocument.documentElement);
     equal(stored().scramble.join(","), next.scramble.join(","));
     equal(stored().timer.elapsedMs, 0);
+    equal(stored().timer.startedAt, null);
     equal($("#moves").textContent, "0");
   } finally { frame.remove(); }
 });

@@ -30,7 +30,7 @@ function RankingPanel({ ranking, reload }) {
     h("div", { class: "panel-head" },
       h("div", {}, h("p", { class: "eyebrow" }, "CHALLENGE LEADERBOARD"), h("h2", { id: "ranking-title" }, "공통 도전 · TOP 10")),
       h("button", { id: "refresh-ranking", class: "button compact", type: "button", disabled: ranking.loading, onClick: reload }, ranking.loading ? "불러오는 중…" : "랭킹 새로고침")),
-    h("p", { class: "helper" }, "랜덤 배치의 성공 기록이에요. 이동 횟수가 같으면 더 빨리 푼 기록이 앞서요."),
+    h("p", { class: "helper" }, "이름별 최고 기록이에요. 이동 횟수가 적은 기록이 우선이고, 같으면 더 빨리 푼 기록이 앞서요."),
     h("p", { class: ranking.error ? "api-error" : "save-note", role: "status", "aria-live": "polite" },
       ranking.error || (ranking.loading ? "기록을 불러오고 있어요." : ranking.rows.length ? "서버를 다시 시작해도 기록은 유지돼요." : "아직 기록이 없어요. 첫 번째 성공 기록을 남겨보세요.")),
     h("ol", { class: "ranking-list", id: "ranking-list" }, ranking.rows.map((row, index) =>
@@ -40,14 +40,15 @@ function RankingPanel({ ranking, reload }) {
           h("span", { class: "rank-time" }, row.elapsed_ms == null ? "시간 미측정" : formatSeconds(row.elapsed_ms)))))));
 }
 
-function RecordForm({ nickname, changeName, submit, submission, solved, ranked, saved, verification, retry }) {
+function RecordForm({ nickname, changeName, submit, submission, solved, ranked, saved, outcome, verification, retry }) {
+  const savedMessage = outcome === "kept" ? "기존 최고 기록을 유지했어요." : outcome === "improved" ? "최고 기록을 갱신했어요." : "기록을 저장했어요. 아래 랭킹에서 확인하세요.";
   return h("form", { id: "record-form", class: "record-form", onSubmit: submit },
     h("label", { for: "record-nickname" }, "랭킹에 남길 닉네임"),
     h("div", { class: "record-fields" },
       h("input", { id: "record-nickname", name: "nickname", value: nickname, maxlength: 20, placeholder: "1~20자", autocomplete: "nickname", disabled: submission.busy, onInput: changeName }),
       h("button", { id: "save-record", class: "button primary", type: "submit", disabled: !ranked || !solved || verification.status !== "done" || submission.busy || saved || !nickname.trim() }, submission.busy ? "저장 중…" : saved ? "저장 완료" : "성공 기록 저장")),
     h("p", { id: "record-status", class: submission.error ? "api-error" : "save-note", role: "status", "aria-live": "polite" },
-      submission.error || (saved ? "기록을 저장했어요. 아래 랭킹에서 확인하세요." : !ranked ? "공통 도전에 참여하면 랭킹을 등록할 수 있어요." : !solved ? "모든 불을 끄면 성공 기록을 저장할 수 있어요." : verification.status === "done" ? "시간 측정이 끝났어요. 닉네임을 입력하고 기록을 남겨보세요." : "성공 기록을 확인하고 있어요.")),
+      submission.error || (saved ? savedMessage : !ranked ? "공통 도전에 참여하면 랭킹을 등록할 수 있어요." : !solved ? "모든 불을 끄면 성공 기록을 저장할 수 있어요." : verification.status === "done" ? "시간 측정이 끝났어요. 닉네임을 입력하고 기록을 남겨보세요." : "성공 기록을 확인하고 있어요.")),
     verification.error ? h("div", { class: "api-error", role: "alert" }, verification.error,
       h("button", { id: "retry-finish", type: "button", class: "button compact", onClick: retry }, "성공 확인 재시도")) : null);
 }
@@ -60,6 +61,7 @@ function Puzzle({ storage, api }) {
   const [refresh, setRefresh] = useState(0);
   const [submission, setSubmission] = useState({ busy: false, error: "", saved: "" });
   const [starting, setStarting] = useState(false);
+  const [beginning, setBeginning] = useState(false);
   const [startError, setStartError] = useState("");
   const [verification, setVerification] = useState({ status: "idle", error: "" });
   const [finishRetry, setFinishRetry] = useState(0);
@@ -71,12 +73,31 @@ function Puzzle({ storage, api }) {
   const ranked = game.puzzleId === CHALLENGE.id && Boolean(game.attemptId);
   const saved = Boolean(game.recordId);
   const elapsedMs = elapsedAt(game.timer);
-  const busy = starting || submission.busy;
+  const busy = starting || beginning || submission.busy;
   const requests = useMemo(() => ({ active: true, generation: 0 }), []);
 
   function timedUpdate(current, next) {
     if (next === current) return current;
     return { ...next, timer: changeTimer(current.timer, boardAt(next).some(Boolean)) };
+  }
+
+  async function beginAndPlay(index) {
+    const generation = ++requests.generation;
+    setBeginning(true);
+    setStartError("");
+    try {
+      const result = await api.begin(game.attemptId);
+      if (!requests.active || generation !== requests.generation) return;
+      setGame(current => {
+        if (current.attemptId !== game.attemptId) return current;
+        const started = { ...current, timer: { elapsedMs: result.elapsedMs, startedAt: Date.now() } };
+        return timedUpdate(started, play(started, index));
+      });
+    } catch (error) {
+      if (requests.active && generation === requests.generation) setStartError(error.message || "시간 측정에 실패했어요. 보드를 다시 눌러주세요.");
+    } finally {
+      if (requests.active && generation === requests.generation) setBeginning(false);
+    }
   }
 
   async function startChallenge(sameBoard = false) {
@@ -99,7 +120,13 @@ function Puzzle({ storage, api }) {
   const actions = useMemo(() => ({
     click(event) {
       const cell = event.target.closest?.("button[data-cell]");
-      if (cell && !busy) setGame(current => timedUpdate(current, play(current, Number(cell.dataset.cell))));
+      if (!cell || busy || solved) return;
+      const index = Number(cell.dataset.cell);
+      if (ranked && game.timer?.startedAt == null && !game.timer?.elapsedMs) {
+        void beginAndPlay(index);
+        return;
+      }
+      setGame(current => timedUpdate(current, play(current, index)));
     },
     hover(event) {
       const cell = event.target.closest?.("button[data-cell]");
@@ -126,7 +153,7 @@ function Puzzle({ storage, api }) {
     },
     newGame() { requests.generation += 1; setGame(createGame()); setHovered(null); setStartError(""); setSubmission({ busy: false, error: "", saved: "" }); },
     challenge() { void startChallenge(); },
-  }), [setGame, setHovered, ranked, solved, busy, game.attemptId, api]);
+  }), [setGame, setHovered, ranked, solved, busy, game.attemptId, game.timer?.startedAt, game.timer?.elapsedMs, api]);
 
   useEffect(() => () => { requests.active = false; requests.generation += 1; }, [requests]);
   useEffect(() => {
@@ -162,7 +189,7 @@ function Puzzle({ storage, api }) {
     setSubmission({ busy: true, error: "", saved: "" });
     try {
       const result = await api.submit({ puzzleId: CHALLENGE.id, attemptId: game.attemptId, nickname: nickname.trim() });
-      setGame(current => current.attemptId === game.attemptId ? { ...current, recordId: result.id } : current);
+      setGame(current => current.attemptId === game.attemptId ? { ...current, recordId: result.id, recordOutcome: result.outcome } : current);
       setSubmission({ busy: false, error: "", saved: "" });
       setRefresh(value => value + 1);
     } catch (error) { setSubmission({ busy: false, error: error.message || "저장하지 못했어요. 다시 시도하세요.", saved: "" }); }
@@ -194,9 +221,9 @@ function Puzzle({ storage, api }) {
       h("p", { class: "save-note" }, "진행 상황을 자동 저장해요. 같은 서버에서 새로고침해도 이어 할 수 있어요."),
       api ? h("div", { class: "challenge-controls" },
         h("button", { id: "start-challenge", type: "button", class: "button challenge-button", disabled: busy, onClick: actions.challenge }, starting ? "랜덤 배치 준비 중…" : "공통 도전 시작 →"),
-        h("p", { class: "save-note" }, "시작할 때마다 새 배치와 시간으로 도전해요. 성공하면 시간이 멈춰요."),
+        h("p", { class: "save-note" }, "보드를 처음 누르면 시간 측정이 시작돼요. 성공하면 시간이 멈춰요."),
         startError ? h("p", { class: "api-error", role: "alert" }, startError) : null,
-        h(RecordForm, { nickname, changeName: event => setNickname(event.target.value), submit, submission, solved, ranked, saved, verification, retry: () => setFinishRetry(value => value + 1) })) : null),
+        h(RecordForm, { nickname, changeName: event => setNickname(event.target.value), submit, submission, solved, ranked, saved, outcome: game.recordOutcome, verification, retry: () => setFinishRetry(value => value + 1) })) : null),
     api ? h(RankingPanel, { ranking, reload: () => setRefresh(value => value + 1) }) : null);
 }
 
