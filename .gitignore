@@ -1,0 +1,5 @@
+# Local database and lock files must not be published.
+/data/
+__pycache__/
+*.py[cod]
+.venv/

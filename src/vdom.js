@@ -17,6 +17,7 @@ export function element(type, props = {}, ...children) {
   };
 }
 
+// 실제 DOM의 태그·속성·자식을 읽어 비교할 수 있는 VDOM 객체로 변환한다.
 export function fromDOM(node) {
   if (node.nodeType === 3) return text(node.data);
   if (node.nodeType === 8) return { type: "#comment", value: node.data };
@@ -42,7 +43,7 @@ function setProp(node, name, previous, next) {
     return;
   }
 
-  // Input properties hold the live values; the attributes hold the HTML defaults.
+  // DOM 프로퍼티는 입력의 현재 값을, HTML 속성은 초기값을 나타낸다.
   if (name === "value" && /^(input|textarea|select)$/.test(node.localName) && node.type !== "file") {
     const value = next == null ? "" : String(next);
     if (node.value !== value) node.value = value;
@@ -59,6 +60,7 @@ function setProp(node, name, previous, next) {
   }
 }
 
+// VDOM으로 실제 DOM 노드를 만들고 속성과 이벤트 핸들러를 연결한다.
 export function toDOM(tree, doc = document, inheritedNamespace = null) {
   if (tree.type === "#text") return doc.createTextNode(tree.value);
   if (tree.type === "#comment") return doc.createComment(tree.value);
@@ -83,6 +85,7 @@ function sameTree(before, after) {
     && before.children.every((child, index) => sameTree(child, after.children[index]));
 }
 
+// 이전·새 VDOM을 비교해 텍스트·속성 변경, 노드 삽입·삭제·교체 목록을 만든다.
 export function diff(previous, next) {
   const patches = [];
 
@@ -110,7 +113,7 @@ export function diff(previous, next) {
     let beforeEnd = before.children.length;
     let afterEnd = after.children.length;
     if (beforeEnd !== afterEnd) {
-      // Preserve unchanged siblings around the edited range when children are inserted or removed.
+      // 자식이 추가되거나 삭제돼도 변경 구간 앞뒤의 같은 노드는 재사용한다.
       while (start < beforeEnd && start < afterEnd && sameTree(before.children[start], after.children[start])) start += 1;
       while (beforeEnd > start && afterEnd > start && sameTree(before.children[beforeEnd - 1], after.children[afterEnd - 1])) {
         beforeEnd -= 1;
@@ -122,7 +125,7 @@ export function diff(previous, next) {
     for (let index = start; index < commonEnd; index += 1) {
       compare(before.children[index], after.children[index], [...path, index]);
     }
-    // Remove from right to left so the remaining child indices stay valid.
+    // 오른쪽부터 지워야 아직 삭제하지 않은 자식의 인덱스가 밀리지 않는다.
     for (let index = beforeEnd - 1; index >= commonEnd; index -= 1) {
       patches.push({ kind: "remove", path: [...path, index] });
     }
@@ -140,6 +143,7 @@ function childNamespace(parent) {
     ? null : parent.namespaceURI;
 }
 
+// Diff가 만든 변경 목록의 대상 노드만 수정하고 나머지 DOM은 재사용한다.
 export function patch(root, patches) {
   for (const change of patches) {
     const node = change.path.reduce((parent, index) => parent.childNodes[index], root);

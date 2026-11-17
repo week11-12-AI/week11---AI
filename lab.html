@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="mini-react-run" content="__SERVER_RUN_ID__">
+  <title>Virtual DOM 실험실 · Lights Out</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="module" src="./src/lab-main.js"></script>
+</head>
+<body>
+  <header class="site-header wrap">
+    <a class="brand" href="/"><span class="brand-mark" aria-hidden="true">◉</span> LIGHTS OUT</a>
+    <a href="/" class="text-link">← 퍼즐로 돌아가기</a>
+  </header>
+  <main class="wrap lab-page">
+    <section id="phase-1" class="phase" aria-labelledby="lab-title">
+      <div class="section-heading">
+        <div><p class="eyebrow">PHASE 01</p><h2 id="lab-title">Virtual DOM 실험실</h2></div>
+        <span class="chip">변환 → Diff → Patch</span>
+      </div>
+      <div class="lab-grid">
+        <article class="panel">
+          <header class="panel-head"><h3>실제 영역</h3><span class="chip">적용된 결과</span></header>
+          <div id="actual" class="sample-frame">
+            <div class="sample-content"><h3>이번 주 학습</h3>
+<p class="sample-note">Virtual DOM을 실험해 보세요.</p>
+<ul><li>React</li><li>Redis</li></ul></div>
+          </div>
+          <div class="history-controls">
+            <button id="history-back" type="button" class="button" disabled>← 뒤로가기</button>
+            <span id="history-position" aria-live="polite">1 / 1</span>
+            <button id="history-forward" type="button" class="button" disabled>앞으로가기 →</button>
+          </div>
+        </article>
+        <article class="panel">
+          <header class="panel-head"><h3>테스트 영역</h3><span class="chip">HTML 미리보기</span></header>
+          <div id="preview" class="sample-frame" inert></div>
+          <label for="markup">샘플 HTML 수정</label>
+          <textarea id="markup" rows="6" spellcheck="false" aria-describedby="markup-help"></textarea>
+          <p id="markup-help" class="helper">직접 작성한 onclick 코드는 Patch 적용 후 실제 영역에서 실행됩니다. 예: &lt;button onclick="alert('1234')"&gt;aaa&lt;/button&gt;. 내부 버튼을 클릭하면 부모 div의 onclick에도 이벤트가 전달됩니다.</p>
+          <button id="apply-patch" type="button" class="button primary">Patch 적용</button>
+        </article>
+      </div>
+      <output id="patch-summary" class="patch-summary" aria-live="polite">테스트 영역을 편집한 뒤 Patch를 적용해 보세요.</output>
+    </section>
+
+</main></body></html>

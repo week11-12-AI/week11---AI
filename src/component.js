@@ -5,7 +5,7 @@ let activeFrame = null;
 export function h(type, props = {}, ...children) {
   if (typeof type !== "function") return element(type, props, ...children);
 
-  // Children are pure functions. Only the FunctionComponent root may use hooks.
+  // 자식 컴포넌트는 순수 함수로 호출하고, Hook은 루트 컴포넌트에서만 사용한다.
   const parentFrame = activeFrame;
   activeFrame = null;
   try {
@@ -15,6 +15,7 @@ export function h(type, props = {}, ...children) {
   }
 }
 
+// Hook 호출 순서를 배열 위치로 사용해 이전 렌더링의 상태를 찾는다.
 function claim(kind) {
   if (!activeFrame) throw new Error("Hooks are only available in the root component.");
   const index = activeFrame.cursor++;
@@ -34,6 +35,7 @@ function copyDependencies(deps) {
   return [...deps];
 }
 
+// 상태를 hooks 배열에 보관하고, 값이 달라지면 루트 컴포넌트를 다시 렌더링한다.
 export function useState(initial) {
   const { frame, index, previous } = claim("state");
   const owner = frame.owner;
@@ -53,6 +55,7 @@ export function useState(initial) {
   return [slot.value, slot.set];
 }
 
+// 의존성이 같으면 이전 계산 결과를 재사용하고, 달라졌을 때만 다시 계산한다.
 export function useMemo(compute, deps) {
   const { frame, index, previous } = claim("memo");
   const dependencies = copyDependencies(deps);
@@ -62,6 +65,7 @@ export function useMemo(compute, deps) {
   return slot.value;
 }
 
+// 의존성이 달라지면 DOM 반영 뒤 이전 작업을 정리하고 새 부수 효과를 실행한다.
 export function useEffect(setup, deps) {
   const { frame, index, previous } = claim("effect");
   const dependencies = copyDependencies(deps);
@@ -113,7 +117,7 @@ export class FunctionComponent {
 
     this.updating = true;
     try {
-      // An effect may request another update. Finish the current commit first.
+      // Effect가 다시 렌더링을 요청해도 현재 변경을 화면에 반영한 뒤 처리한다.
       for (let passes = 0; this.pending && this.mounted; passes += 1) {
         if (passes === 50) throw new Error("Too many consecutive root updates.");
         this.pending = false;
@@ -124,6 +128,7 @@ export class FunctionComponent {
     }
   }
 
+  // 함수가 반환한 VDOM을 이전 트리와 비교해 변경 부분을 Patch한 뒤 Effect를 실행한다.
   #renderAndCommit() {
     const frame = { owner: this, cursor: 0, hooks: [], effects: [] };
     const previousFrame = activeFrame;
