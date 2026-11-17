@@ -1,4 +1,4 @@
-"""Standalone HTTP Mini Redis. Run python -m mini_redis.server."""
+"""독립 실행형 미니 Redis 서버. python -m mini_redis.server로 실행한다."""
 import argparse
 from threading import Event, Thread
 from urllib.parse import unquote
@@ -11,6 +11,7 @@ class CacheAPI:
     def __init__(self, store, pool_stats):
         self.store, self.pool_stats = store, pool_stats
 
+    # 외부 HTTP 요청을 해시 저장소의 set·get·delete 또는 통계 조회로 연결한다.
     def handle(self, method, path, body=None):
         if method == "GET" and path == "/api/cache/stats":
             return 200, {**self.store.stats(), "pool": self.pool_stats()}
@@ -44,6 +45,7 @@ def main():
     args = parser.parse_args()
     server = create_server(args.port, args.host)
     stop = Event()
+    # 조회되지 않는 키도 정리할 수 있도록 1초마다 만료 항목을 제거한다.
     def cleanup():
         while not stop.wait(1):
             server.db.sweep()

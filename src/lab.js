@@ -16,7 +16,7 @@ const legacyClickAttribute = "data-lab-click-text";
 function readDraft(source, doc) {
   const template = doc.createElement("template");
   template.innerHTML = source;
-  // Keep click source as serializable VDOM data. Only the actual area binds it.
+  // 클릭 코드는 저장할 수 있는 VDOM 데이터로 두고, 실제 영역에서만 이벤트로 연결한다.
   for (const node of template.content.querySelectorAll("*")) {
     if (!passiveElements.has(node.localName)) {
       node.remove();
@@ -66,7 +66,7 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
         if (clickBindings.has(node)) node.onclick = null;
       } else {
         try {
-          // Use this document's realm so alert, document and window refer to the lab.
+          // 실험실 창에서 실행해 alert, document, window가 그 창을 가리키게 한다.
           const handler = new doc.defaultView.Function("event", source);
           node.onclick = function (event) {
             try {
@@ -137,7 +137,7 @@ export function mountLab({ actual, preview, editor, patchButton, back, forward, 
     updatePreview();
     const next = fromDOM(previewRoot);
     const historyChanges = diff(history.current.tree, next);
-    // A click handler may have changed text, attributes or children since the last Patch.
+    // 마지막 Patch 이후 클릭이 텍스트·속성·자식 노드를 바꿨을 수 있어 현재 DOM부터 읽는다.
     actualTree = fromDOM(actualRoot);
     const patches = diff(actualTree, next);
     observer.takeRecords();

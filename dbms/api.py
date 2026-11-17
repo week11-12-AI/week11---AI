@@ -1,4 +1,4 @@
-"""The existing React API contract, now executed in Python."""
+"""퍼즐 화면에서 호출하는 도전·랭킹 API와 외부 SQL API를 처리한다."""
 from datetime import datetime, timezone
 import os
 from threading import Lock
@@ -17,10 +17,12 @@ class API:
         self.cache_prefix = "ranking:" + uuid4().hex
         self.ranking_lock = Lock()
 
+    # 실행 ID와 테이블 버전으로 키를 만들어 이전 랭킹 캐시와 구분한다.
     def ranking_key(self):
         version = self.db.stats()["tables"]["records"]["version"]
         return f"{self.cache_prefix}:{CHALLENGE['id']}:{version}"
 
+    # 캐시 히트면 바로 반환하고, 미스면 DBMS에서 TOP 10을 구해 30초간 저장한다.
     def ranking(self, use_cache=True):
         with self.ranking_lock:
             key = self.ranking_key()
@@ -33,6 +35,7 @@ class API:
                 self.cache.set(key, result, 30)
             return result
 
+    # API.handle: HTTP 요청의 메서드와 경로에 맞춰 SQL·도전·랭킹 기능을 호출한다.
     def handle(self, method, path, body=None):
         if method == "GET" and path == "/api/challenge":
             return 200, CHALLENGE
@@ -53,6 +56,7 @@ class API:
             nickname = body.get("nickname", "")
             nickname = nickname.strip() if isinstance(nickname, str) else ""
             check(1 <= len(nickname) <= 20, "NICKNAME", "닉네임은 공백을 제외하고 1~20자여야 합니다.")
+            # 이름별 최고 기록을 비교·저장하고, DB 변경이 성공하면 이전 캐시를 비운다.
             def save(moves, elapsed_ms):
                 created_at = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
                 with self.ranking_lock:

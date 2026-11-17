@@ -1,4 +1,4 @@
-"""Thread-safe chained hash table. Values are stored as JSON text."""
+"""동시 접근을 잠금으로 보호하는 체이닝 해시 테이블. 값은 JSON 문자열로 저장한다."""
 import json
 import math
 import time
@@ -26,12 +26,14 @@ class Store:
         self.expired = 0
 
     @staticmethod
+    # 문자열 키를 일정한 정수 해시값으로 바꾼다.
     def hash_key(key):
         value = 2166136261
         for byte in key.encode("utf-8"):
             value = ((value ^ byte) * 16777619) & 0xffffffff
         return value
 
+    # 해시값 % 버킷 수로 저장 위치를 고른다. 충돌한 키는 같은 목록에 보관한다.
     def _bucket(self, key):
         try:
             valid = isinstance(key, str) and bool(key.strip()) and len(key.encode("utf-8")) <= 512
@@ -44,6 +46,7 @@ class Store:
     def _expired(self, entry):
         return entry.expires_at is not None and self.clock() >= entry.expires_at
 
+    # 모든 버킷에서 TTL이 끝난 항목을 제거해 메모리를 회수한다.
     def sweep(self):
         with self.lock:
             for bucket in self.buckets:
@@ -60,6 +63,7 @@ class Store:
             for entry in bucket:
                 self._bucket(entry.key).append(entry)
 
+    # 잠금 안에서 값과 만료 시각을 저장한다. 같은 키는 덮어쓰고 TTL도 새로 설정한다.
     def set(self, key, value, ttl=None):
         check(ttl is None or (type(ttl) in (int, float) and 0 < ttl <= 86400 and math.isfinite(ttl)),
               "TTL", "TTL은 0초 초과 86400초 이하 숫자여야 합니다.")
@@ -83,6 +87,7 @@ class Store:
             if self.count > len(self.buckets) * 0.75:
                 self._grow()
 
+    # 실제 키와 만료 시각을 확인한다. 유효하면 히트, 없거나 만료됐으면 미스로 처리한다.
     def get(self, key):
         with self.lock:
             bucket = self._bucket(key)
@@ -99,6 +104,7 @@ class Store:
             self.misses += 1
             return False, None
 
+    # 키에 해당하는 항목을 제거한다. 랭킹 변경 후 이전 캐시를 비울 때 사용한다.
     def delete(self, key):
         with self.lock:
             bucket = self._bucket(key)

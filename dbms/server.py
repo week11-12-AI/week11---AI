@@ -1,4 +1,4 @@
-"""Bounded HTTP thread pool. Workers handle parsing, execution and responses."""
+"""제한된 스레드 풀에서 HTTP 요청 해석, 실행, 응답을 처리한다."""
 import json
 import re
 import socket
@@ -20,7 +20,7 @@ TYPES = {".html": "text/html", ".css": "text/css", ".js": "text/javascript"}
 
 
 class Handler(BaseHTTPRequestHandler):
-    # One request per connection avoids idle keep-alive clients occupying the pool.
+    # 연결당 요청 하나만 처리해, 응답이 끝난 연결이 작업 스레드를 점유하지 않게 한다.
     protocol_version = "HTTP/1.0"
 
     def log_message(self, *_args):
@@ -55,7 +55,7 @@ class Handler(BaseHTTPRequestHandler):
         data = self.rfile.read(length)
         check(len(data) == length, "JSON_BODY", "요청 본문이 완성되지 않았습니다.")
         try:
-            # Python's default decoder permits NaN; JSON APIs must reject it.
+            # Python은 기본 설정에서 NaN을 허용하므로 JSON 요청에서는 명시적으로 거부한다.
             def invalid_constant(_value):
                 raise ValueError("non-finite JSON number")
             body = json.loads(data, parse_constant=invalid_constant)
@@ -64,6 +64,7 @@ class Handler(BaseHTTPRequestHandler):
         check(isinstance(body, dict), "JSON_BODY", "JSON 객체가 필요합니다.")
         return body
 
+    # API 요청은 API.handle로 전달하고, 페이지 요청은 허용된 정적 파일로 응답한다.
     def _dispatch(self):
         try:
             try:
@@ -129,14 +130,15 @@ class PoolHTTPServer(HTTPServer):
         request.settimeout(10)
         return request, address
 
+    # 요청을 기존 스레드 풀에 맡기며, 실행·대기 한도를 넘으면 503으로 거부한다.
     def process_request(self, request, client_address):
         if not self._slots.acquire(blocking=False):
             try:
                 data = b'{"error":{"code":"SERVER_BUSY","message":"Request queue is full"}}'
                 request.settimeout(0.1)
                 request.sendall(b"HTTP/1.0 503 Service Unavailable\r\nContent-Type: application/json\r\nContent-Length: " + str(len(data)).encode() + b"\r\nConnection: close\r\n\r\n" + data)
-                # A close with unread request bytes can reset TCP on Windows,
-                # discarding the 503. Half-close, then drain for at most 100ms.
+                # Windows에서는 요청 본문을 다 읽기 전에 연결을 닫으면 503 응답이 유실될 수 있다.
+                # 송신만 먼저 닫고 남은 요청은 최대 100ms 동안 읽는다.
                 request.shutdown(socket.SHUT_WR)
                 deadline = time.monotonic() + 0.1
                 while time.monotonic() < deadline and request.recv(8192):
@@ -187,6 +189,7 @@ class PoolHTTPServer(HTTPServer):
             self.db.close()
 
 
+# 파일에서 복원한 DBMS와 HTTP 스레드 풀을 연결해 앱 서버를 만든다.
 def create_server(port=4173, *, host="127.0.0.1", data_dir=None, workers=4, max_queue=128):
     db = Database(data_dir or ROOT / "data")
     try:

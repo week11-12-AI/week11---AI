@@ -1,5 +1,6 @@
 import { CHALLENGE } from "./challenge.js";
 
+// 화면의 도전 시작·시간 측정·성공 확인·기록 저장·랭킹 조회를 서버 API로 연결한다.
 export function createPuzzleAPI() {
   async function request(path, options = {}) {
     const controller = new AbortController();

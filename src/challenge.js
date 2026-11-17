@@ -1,4 +1,4 @@
-// This ID identifies the random-five-move challenge category, not a fixed board.
+// 이 ID는 무작위로 다섯 칸을 눌러 만드는 도전 유형을 구분한다. 보드 배치는 매번 달라질 수 있다.
 export const CHALLENGE = Object.freeze({ id: "challenge-01", title: "공통 도전 · 랜덤", scrambleSize: 5 });
 
 export function createChallenge(attempt) {

@@ -1,4 +1,4 @@
-// Persist timestamps, not interval ticks: refreshes and background tabs keep time.
+// 시작 시각을 저장해 새로고침하거나 탭이 백그라운드에 있어도 경과 시간을 계산한다.
 export function elapsedAt(timer, now = Date.now()) {
   if (!timer) return 0;
   return timer.elapsedMs + (timer.startedAt === null ? 0 : Math.max(0, now - timer.startedAt));

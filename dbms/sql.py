@@ -1,4 +1,4 @@
-"""Tokenize SQL into a small AST without eval or string interpolation."""
+"""SQL을 토큰으로 나눈 뒤 실행에 필요한 구조(AST)로 변환한다."""
 import math
 import re
 from .errors import check, DBError
@@ -16,6 +16,7 @@ def finite_number(value):
         return False
 
 
+# SQL을 명령·이름·값·기호로 나누고 ? 자리에 전달받은 값을 연결한다.
 def tokenize(sql, params):
     check(isinstance(sql, str) and 0 < len(sql) <= 1_000_000, "SQL_SYNTAX", "SQL은 1~1,000,000자여야 합니다.")
     check(isinstance(params, list), "SQL_PARAMS", "params는 배열이어야 합니다.")
@@ -103,6 +104,7 @@ class Parser:
         self.expect("=")
         return column, self.value()
 
+    # SQL 문법을 확인하고 실행 엔진이 사용할 명령·테이블·조건 정보(AST)를 만든다.
     def parse(self):
         kind = self.name()
         if kind == "insert":
@@ -146,5 +148,6 @@ class Parser:
         return ast
 
 
+# SQL 문자열을 토큰화한 뒤 AST로 변환하는 진입점이다.
 def parse_sql(sql, params=MISSING):
     return Parser(tokenize(sql, [] if params is MISSING else params)).parse()

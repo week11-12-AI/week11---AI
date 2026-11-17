@@ -8,7 +8,7 @@ export function createRunStorage(runId) {
   try {
     if (available) generation = currentGeneration();
   } catch {
-    // The page can still run without browser storage.
+    // 브라우저 저장소를 쓸 수 없어도 페이지는 계속 동작한다.
   }
   const keyFor = (name, version = generation) => storageKey(version ? `${runId}:${version}:${name}` : name);
 
@@ -28,7 +28,7 @@ export function createRunStorage(runId) {
           window.localStorage.setItem(keyFor(name), JSON.stringify({ runId, value }));
         }
       } catch {
-        // The lab remains usable if browser storage is blocked or full.
+        // 저장소 접근이 막혔거나 용량이 가득 차도 실험실은 계속 사용할 수 있다.
       }
     },
     reset(names) {
@@ -36,11 +36,11 @@ export function createRunStorage(runId) {
         if (!available) return;
         const previous = currentGeneration();
         const next = crypto.getRandomValues(new Uint32Array(4)).join("-");
-        // Old tabs keep their old keys even if a write races with the reset.
+        // 초기화와 저장이 겹쳐도 기존 탭은 이전 실행 ID의 키만 사용한다.
         window.localStorage.setItem(resetKey, next);
         for (const name of names) window.localStorage.removeItem(keyFor(name, previous));
       } catch {
-        // Reloading still resets in-memory state when storage is unavailable.
+        // 저장소를 쓸 수 없어도 새로고침하면 메모리의 상태는 초기화된다.
       }
     },
     wasReset(event) {

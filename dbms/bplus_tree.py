@@ -1,4 +1,4 @@
-"""In-memory B+ tree. The caller coordinates concurrent access."""
+"""메모리에서 동작하는 B+ 트리. 동시 접근에 필요한 잠금은 호출자가 관리한다."""
 from bisect import bisect_left, bisect_right
 
 
@@ -37,11 +37,13 @@ class BPlusTree:
             node = node.children[bisect_right(node.keys, key)]
         return node
 
+    # ID가 위치한 리프를 찾아 저장된 레코드 정보를 반환한다.
     def get(self, key):
         node = self._find(key)
         index = bisect_left(node.keys, key)
         return node.values[index] if index < len(node.keys) and node.keys[index] == key else None
 
+    # ID와 값을 삽입·갱신하고, 가득 찬 노드를 분할해 트리 균형을 유지한다.
     def set(self, key, value):
         if type(key) is not int or not 1 <= key <= 2**53 - 1:
             raise ValueError("Index keys must be positive JavaScript-safe integers")
@@ -79,6 +81,7 @@ class BPlusTree:
             parent.children.insert(index + 1, right)
             node = parent
 
+    # ID를 삭제하고 부족한 노드는 이웃과 재분배하거나 병합한다.
     def delete(self, key):
         path, node = [], self.root
         while not node.leaf:
@@ -130,6 +133,7 @@ class BPlusTree:
             self.root = self.root.children[0]
         return True
 
+    # 연결된 리프를 따라 ID 순서로 순회한다. ID 이외 조건 검색에도 사용한다.
     def entries(self, start=float("-inf"), end=float("inf")):
         node = self._find(start)
         index = bisect_left(node.keys, start)

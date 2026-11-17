@@ -81,6 +81,7 @@ function Puzzle({ storage, api }) {
     return { ...next, timer: changeTimer(current.timer, boardAt(next).some(Boolean)) };
   }
 
+  // 첫 클릭에서 서버의 시간 측정 시작을 확인한 뒤 클릭과 타이머를 화면에 반영한다.
   async function beginAndPlay(index) {
     const generation = ++requests.generation;
     setBeginning(true);
@@ -100,6 +101,7 @@ function Puzzle({ storage, api }) {
     }
   }
 
+  // 서버에서 도전 배치와 ID를 받아 새 게임을 준비하고 첫 클릭을 기다린다.
   async function startChallenge(sameBoard = false) {
     if (!api || busy) return;
     const generation = ++requests.generation;
@@ -183,6 +185,7 @@ function Puzzle({ storage, api }) {
     return () => { active = false; };
   }, [api, refresh]);
 
+  // 성공 확인이 끝난 기록을 등록하고, 최고 기록 갱신·유지 결과와 최신 랭킹을 표시한다.
   async function submit(event) {
     event.preventDefault();
     if (!api || !ranked || !solved || saved || busy || verification.status !== "done" || !nickname.trim()) return;

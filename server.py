@@ -1,4 +1,4 @@
-"""Run with: python server.py. No third-party packages are needed."""
+"""python server.py로 실행한다. 외부 패키지는 필요 없다."""
 import argparse
 import json
 import os
@@ -22,7 +22,7 @@ def main():
         raise KeyboardInterrupt
 
     def control():
-        # Private parent-child pipe, never an HTTP shutdown endpoint.
+        # 테스트 서버의 종료 신호는 부모·자식 프로세스 사이의 전용 파이프로 받는다.
         for line in sys.stdin:
             if line.strip() == "shutdown":
                 break

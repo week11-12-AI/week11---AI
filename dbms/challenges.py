@@ -1,4 +1,4 @@
-"""Server-owned random attempts and elapsed time, scoped to this server run."""
+"""서버가 실행되는 동안 랜덤 도전과 소요 시간을 관리한다."""
 import random
 import time
 from threading import RLock
@@ -24,6 +24,7 @@ def board_for(scramble):
     return board
 
 
+# 서버에서 클릭을 재현해 모든 불이 꺼졌는지, 성공 이후 불필요한 이동이 없는지 검사한다.
 def validate_solution(moves, scramble):
     check(isinstance(moves, list) and 1 <= len(moves) <= 1000
           and all(type(move) is int and 0 <= move < 25 for move in moves),
@@ -53,6 +54,7 @@ class ChallengeAttempts:
               "ATTEMPT_EXPIRED", "도전 정보가 만료되었습니다. 공통 도전을 다시 시작하세요.", 410)
         return self.attempts[attempt_id]
 
+    # 풀 수 있는 배치와 도전 ID를 발급한다. 재도전은 같은 배치를 사용한다.
     def start(self, restart_id=None):
         with self.lock:
             self._prune()
@@ -70,6 +72,7 @@ class ChallengeAttempts:
             self.attempts[attempt_id] = dict(scramble=scramble, created=self.clock(), started=None, solution=None, elapsed_ms=None, record=None)
             return {**CHALLENGE, "attemptId": attempt_id, "scramble": list(scramble)}
 
+    # 첫 보드 클릭 요청에서 시간을 시작하며 재요청해도 시작 시각을 유지한다.
     def begin(self, attempt_id):
         with self.lock:
             attempt = self._find(attempt_id)
@@ -80,6 +83,7 @@ class ChallengeAttempts:
                 elapsed = max(0, round((self.clock() - attempt["started"]) * 1000))
             return dict(attemptId=attempt_id, elapsedMs=elapsed)
 
+    # 해답을 검증하고 서버 시계로 소요 시간을 확정한다. 재요청은 확정된 시간을 반환한다.
     def finish(self, attempt_id, moves):
         with self.lock:
             attempt = self._find(attempt_id)
@@ -93,7 +97,7 @@ class ChallengeAttempts:
             return dict(attemptId=attempt_id, elapsedMs=attempt["elapsed_ms"], moves=len(moves))
 
     def register(self, attempt_id, nickname, save):
-        # Also makes concurrent/retried record submissions idempotent per attempt.
+        # 검증된 결과를 save에 넘긴다. 같은 도전의 중복·동시 등록은 기존 결과를 반환한다.
         with self.lock:
             attempt = self._find(attempt_id)
             check(attempt["solution"] is not None, "NOT_FINISHED", "먼저 퍼즐을 완료하고 성공 확인을 받아야 합니다.", 409)

@@ -1,4 +1,4 @@
-"""Checksummed append-only transactions, compatible with the former JS format."""
+"""변경 로그에 체크섬을 붙여 추가한다. 기존 JavaScript 버전의 파일도 읽을 수 있다."""
 import hashlib
 import json
 import os
@@ -28,6 +28,7 @@ def decode_transaction(line):
 
 
 class Journal:
+    # 파일 소유권을 확보하고 기존 로그를 순서대로 적용해 DB 상태를 복원한다.
     def __init__(self, directory, apply):
         self.directory = Path(directory).resolve()
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -71,8 +72,9 @@ class Journal:
         self.file.flush()
         os.fsync(self.file.fileno())
 
+    # 체크섬을 붙여 로그를 추가하고 디스크에 동기화한다. 실패하면 파일 크기를 되돌린다.
     def append(self, transaction):
-        # Database's commit lock serializes all operations on this write handle.
+        # DBMS의 커밋 잠금으로 이 파일 핸들의 쓰기를 한 번에 하나씩 처리한다.
         check(not self.poisoned, "DB_UNAVAILABLE", "저장 오류 후 중단되었습니다. 서버를 재시작하세요.", 503)
         payload = dumps({**transaction, "sequence": self.sequence + 1})
         data = (dumps({"checksum": hashlib.sha256(payload.encode("utf-8")).hexdigest(), "payload": payload}) + "\n").encode("utf-8")
@@ -97,11 +99,12 @@ class Journal:
         self.sequence += 1
         return location
 
+    # 인덱스가 가진 파일 위치에서 로그를 읽고 체크섬을 확인해 실제 행을 반환한다.
     def read_rows(self, records):
         if not records:
             return []
         transactions, rows = {}, []
-        # Each reader has its own seek offset: safe on both Windows and POSIX.
+        # 조회마다 파일을 따로 열어 동시에 읽어도 읽기 위치가 서로 섞이지 않게 한다.
         try:
             with self.path.open("rb") as source:
                 for record in records:

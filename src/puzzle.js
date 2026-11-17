@@ -23,7 +23,7 @@ export function boardAt(game) {
   return board;
 }
 
-// Start from a solved board and apply legal moves, so every puzzle has a solution.
+// 완성된 보드에서 유효한 클릭을 적용해, 같은 클릭으로 되돌릴 수 있는 퍼즐을 만든다.
 export function createGame(random = Math.random) {
   const cells = Array.from({ length: CELL_COUNT }, (_, index) => index);
   for (let index = cells.length - 1; index > 0; index -= 1) {

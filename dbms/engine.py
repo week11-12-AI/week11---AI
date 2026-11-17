@@ -1,4 +1,4 @@
-"""SQL execution, optimistic validation, and thread-safe durable commits."""
+"""SQL을 실행하고, 버전 검증과 잠금으로 동시 저장을 제어한다."""
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -41,7 +41,7 @@ SCHEMAS = {
 
 
 def compatible_row(name, row):
-    # Old immutable log entries remain byte-for-byte intact (including checksums).
+    # 예전 로그는 체크섬까지 그대로 두고, 읽어 온 행에만 빠진 항목을 채운다.
     if name == "records" and isinstance(row, dict) and "elapsed_ms" not in row:
         return {**row, "elapsed_ms": None}
     return row
@@ -55,7 +55,7 @@ def validate_row(name, row):
 
 @dataclass(frozen=True, slots=True)
 class Record:
-    # Owned by the engine, never mutated after commit or returned to API callers.
+    # 엔진 내부의 레코드다. 커밋 후 직접 수정하거나 API 호출자에게 그대로 반환하지 않는다.
     row: dict
     location: tuple
     index: int
@@ -99,6 +99,7 @@ class Database:
     def _columns(table, columns):
         check(all(column in SCHEMAS[table] for column in columns), "DB_COLUMN", "존재하지 않는 컬럼입니다.")
 
+    # 저장된 변경을 B+ 트리·파일 위치·다음 ID에 반영하며, 재시작 복구에도 사용한다.
     def _apply(self, tx, location, replay=False):
         table = self._table(tx["table"])
         if replay:
@@ -120,6 +121,7 @@ class Database:
                 table.index.set(change["id"], Record(change["row"], location, index))
         table.next_id, table.version = tx["nextId"], tx["version"]
 
+    # 값과 ID를 검증하고 INSERT·UPDATE·DELETE의 변경 계획을 만든다.
     def _prepare(self, ast):
         table = self._table(ast["table"])
         next_id, changes = table.next_id, []
@@ -151,8 +153,9 @@ class Database:
                 changes.append(dict(type="put", id=row["id"], row=row))
         return dict(table=ast["table"], changes=changes, nextId=next_id, version=table.version + 1), table.version
 
+    # ID 검색 또는 리프 순회로 조회 대상을 고르고 정렬·중복 이름·LIMIT을 처리한다.
     def _snapshot(self, ast, unique_by=None):
-        # Only index traversal is protected. File I/O happens outside this lock.
+        # 인덱스 탐색만 잠금으로 보호한다. 파일 읽기는 잠금을 해제한 뒤 수행한다.
         table = self._table(ast["table"])
         if unique_by is not None:
             self._columns(ast["table"], [unique_by])
@@ -175,7 +178,7 @@ class Database:
             for item in ast["order"]:
                 left, right = a.row[item["column"]], b.row[item["column"]]
                 if left != right:
-                    # Missing legacy timings follow measured timings in either direction.
+                    # 예전 기록에 시간이 없으면 오름차순·내림차순 모두 측정된 기록 뒤에 둔다.
                     if left is None:
                         return 1
                     if right is None:
@@ -193,7 +196,7 @@ class Database:
                 if len(records) == limit:
                     break
             else:
-                # Keep the best row per group before LIMIT, including legacy duplicates.
+                # 예전 중복 기록까지 포함해 이름별 최고 기록 하나만 상위 후보에 남긴다.
                 if unique_by is not None:
                     duplicate = next((i for i, item in enumerate(records)
                                       if item.row[unique_by] == record.row[unique_by]), None)
@@ -215,6 +218,7 @@ class Database:
         self.metrics["reads"] += 1
         return records, dict(version=table.version, plan=plan, scanned=scanned)
 
+    # 조회는 파일에서 읽고, 쓰기는 버전 확인 → 로그 저장 → 메모리 반영 순서로 확정한다.
     def execute(self, ast, expected_version=MISSING, *, unique_by=None):
         with self._operation():
             check(expected_version is MISSING or (type(expected_version) is int and expected_version >= 0), "DB_VERSION", "expectedVersion은 0 이상의 정수여야 합니다.")
@@ -241,6 +245,7 @@ class Database:
                     self.metrics["commits"] += 1
                     return dict(affectedRows=len(transaction["changes"]), ids=[change["id"] for change in transaction["changes"]], version=table.version)
 
+    # SQL 해석과 실행을 연결해 호출자에게 조회 결과나 변경 결과를 반환한다.
     def query(self, sql, params=MISSING, expected_version=MISSING):
         return self.execute(parse_sql(sql, params), expected_version)
 

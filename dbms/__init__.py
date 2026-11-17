@@ -1,1 +1,1 @@
-"""A small file-backed DBMS implemented with the Python standard library."""
+"""Python 표준 라이브러리로 구현한 파일 기반 미니 DBMS."""

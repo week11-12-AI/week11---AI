@@ -1,4 +1,4 @@
-"""Bounded HTTP cache calls with a short outage backoff."""
+"""캐시 HTTP 요청에 시간 제한을 두고 장애가 나면 잠시 쉬었다가 재시도한다."""
 import json
 import time
 from threading import Lock
@@ -14,6 +14,7 @@ class Client:
         self.retry_at = 0
         self.lock = Lock()
 
+    # 앱에서 Redis로 HTTP 요청을 보낸다. 연결 실패 시 잠시 재시도를 쉬고 None을 반환한다.
     def _call(self, method, key, body=None):
         with self.lock:
             if not self.url or time.monotonic() < self.retry_at:
