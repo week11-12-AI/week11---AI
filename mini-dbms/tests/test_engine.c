@@ -63,6 +63,12 @@ int main(void) {
     d = db_open(dir);
     run(d, "[재시작1]", "SELECT * FROM users WHERE id = 4;", "id | name | age\n4 | choi | 40\n(1 rows)");
     run(d, "[재시작2]", "INSERT INTO users VALUES ('jung', 22);", "INSERT 1 (id = 5)");
+
+    /* Phase 2: id 검색은 B+ 트리 길 */
+    run(d, "[인덱스1]", "SELECT * FROM users WHERE id = 5;", "id | name | age\n5 | jung | 22\n(1 rows)");
+    run(d, "[인덱스2]", "SELECT * FROM users WHERE id = 1;", "id | name | age\n1 | kim | 31\n(1 rows)");
+    run(d, "[인덱스3]", "SELECT * FROM users WHERE id = 999;", "id | name | age\n(0 rows)");
+    run(d, "[인덱스4]", "SELECT * FROM users WHERE id = 'abc';", "(error)");
     db_close(d);
 
     printf("\n통과 %d / 실패 %d\n", passed, failed);

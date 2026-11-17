@@ -7,12 +7,17 @@
 
 typedef struct table table;
 
-/* 파일을 연다 (없으면 만든다). 열 때 파일을 한 번 훑어 다음 id 를 정한다 */
+/* 파일을 연다 (없으면 만든다). 다음 id 는 1로 시작한다.
+ * Phase 2: 켤 때 파일을 훑는 일은 실행기(db_open)가 한 번에 한다 (가장 큰 id + 인덱스 재구축) */
 table *table_open(const char *path);
 void table_close(table *t);
 
-/* 새 레코드에 줄 id (마지막 id + 1). 부를 때마다 1씩 커진다 */
+/* 새 레코드에 줄 id. 부를 때마다 1씩 커진다 */
 long table_new_id(table *t);
+void table_set_next_id(table *t, long next_id);
+
+/* offset 바이트로 바로 가서 한 줄만 읽는다 (B+ 트리가 알려 준 위치). 성공 0, 실패 -1 */
+int table_read_at(table *t, long offset, char *buf, int size);
 
 /* 레코드 한 줄(줄바꿈 없이)을 파일 끝에 붙인다.
  * 그 줄이 시작하는 위치(파일 앞에서부터 몇 바이트)를 돌려준다. 실패 -1

@@ -9,6 +9,7 @@
 #include <strings.h>
 #include <sys/stat.h>
 
+#include "bptree.h"
 #include "sql.h"
 #include "table.h"
 
@@ -33,7 +34,8 @@ static const schema SCHEMAS[] = {
 #define NSCHEMAS ((int)(sizeof SCHEMAS / sizeof SCHEMAS[0]))
 
 struct db {
-    table *tables[NSCHEMAS];   /* SCHEMAS[i] 의 테이블 파일 */
+    table *tables[NSCHEMAS];   /* SCHEMAS[i] 의 테이블 파일 (디스크) */
+    bptree *index[NSCHEMAS];   /* SCHEMAS[i] 의 id 인덱스 (메모리): id → 파일 속 바이트 위치 */
 };
 
 /* ---------- 결과 글자를 이어 붙이는 도구 ---------- */
@@ -145,9 +147,11 @@ static char *exec_insert(db *d, const sql_stmt *st) {
     for (int i = 0; i < st->nvalues; i++) sb_add(&line, ",%s", st->values[i]);
     if (line.s == NULL) return reply("(error) 메모리 부족");
 
-    long offset = table_append(t, line.s);   /* 파일 끝에 붙이기 */
+    long offset = table_append(t, line.s);   /* ① 파일 끝에 붙이기 */
     free(line.s);
     if (offset < 0) return reply("(error) 파일 쓰기 실패");
+    if (bpt_insert(d->index[si], id, offset) < 0)   /* ② B+ 트리에 id → 위치 등록 */
+        return reply("(error) 메모리 부족 (인덱스)");
     return reply("INSERT 1 (id = %ld)", id);
 }
 
@@ -202,8 +206,19 @@ static char *exec_select(db *d, const sql_stmt *st) {
     for (int i = 0; i < c.s->ncols; i++) sb_add(&c.out, i ? " | %s" : "%s", c.s->cols[i].name);
     sb_add(&c.out, "\n");
 
-    /* Phase 1: 조건이 무엇이든 파일을 처음부터 끝까지 읽는다 (선형 탐색) */
-    if (table_scan(d->tables[si], select_row, &c) < 0) {
+    if (c.where_col == 0) {
+        /* 길 ①: WHERE id = ? → B+ 트리에서 위치를 찾아 그 한 줄만 읽는다 */
+        long id = 0, offset = 0;
+        char line[1024];
+        if (is_integer(st->where_val, &id) && bpt_search(d->index[si], id, &offset)) {
+            if (table_read_at(d->tables[si], offset, line, sizeof line) < 0) {
+                free(c.out.s);
+                return reply("(error) 파일 읽기 실패");
+            }
+            select_row(line, offset, &c);
+        }
+    } else if (table_scan(d->tables[si], select_row, &c) < 0) {
+        /* 길 ②: 다른 열 (또는 WHERE 없음) → 파일을 처음부터 끝까지 읽는다 (선형 탐색) */
         free(c.out.s);
         return reply("(error) 파일 읽기 실패");
     }
@@ -213,6 +228,20 @@ static char *exec_select(db *d, const sql_stmt *st) {
 
 /* ---------- 바깥 함수 ---------- */
 
+/* 켤 때 테이블 파일을 한 번 훑으며: 줄마다 B+ 트리에 (id → 위치) 넣고, 가장 큰 id 를 기억한다 */
+typedef struct {
+    bptree *index;
+    long max_id;
+    int failed;
+} rebuild_ctx;
+
+static void rebuild_row(const char *line, long offset, void *arg) {
+    rebuild_ctx *c = arg;
+    long id = strtol(line, NULL, 10);   /* 첫 칸이 id */
+    if (bpt_insert(c->index, id, offset) < 0) c->failed = 1;
+    if (id > c->max_id) c->max_id = id;
+}
+
 db *db_open(const char *dir) {
     if (mkdir(dir, 0755) != 0 && errno != EEXIST) return NULL;
     db *d = calloc(1, sizeof *d);
@@ -221,17 +250,28 @@ db *db_open(const char *dir) {
         char path[512];
         snprintf(path, sizeof path, "%s/%s.csv", dir, SCHEMAS[i].name);
         d->tables[i] = table_open(path);
-        if (d->tables[i] == NULL) {
+        d->index[i] = bpt_create();
+        if (d->tables[i] == NULL || d->index[i] == NULL) {
             db_close(d);
             return NULL;
         }
+        /* 인덱스 재구축 */
+        rebuild_ctx c = { .index = d->index[i] };
+        if (table_scan(d->tables[i], rebuild_row, &c) < 0 || c.failed) {
+            db_close(d);
+            return NULL;
+        }
+        table_set_next_id(d->tables[i], c.max_id + 1);
     }
     return d;
 }
 
 void db_close(db *d) {
     if (d == NULL) return;
-    for (int i = 0; i < NSCHEMAS; i++) table_close(d->tables[i]);
+    for (int i = 0; i < NSCHEMAS; i++) {
+        table_close(d->tables[i]);
+        bpt_free(d->index[i]);
+    }
     free(d);
 }
 
