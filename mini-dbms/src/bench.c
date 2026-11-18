@@ -61,7 +61,10 @@ static int query(const char *dir, long id) {
 
     char sql[128];
     snprintf(sql, sizeof sql, "SELECT * FROM users WHERE id = %ld;", id);
-    timed(d, "[id, 트리]", sql);
+    timed(d, "[id, 인덱스]", sql);
+    db_set_use_index(d, 0);                 /* 같은 SQL 을 인덱스 없이 (선형 탐색) */
+    timed(d, "[id, 인덱스X]", sql);
+    db_set_use_index(d, 1);
     snprintf(sql, sizeof sql, "SELECT * FROM users WHERE name = 'user%ld';", id);
     timed(d, "[name, 선형]", sql);
     db_close(d);

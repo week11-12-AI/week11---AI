@@ -24,6 +24,16 @@ table *table_open(const char *path) {
     }
     t->next_id = 1;
     t->writing = 0;
+
+    /* 엣지 케이스: 파일이 줄바꿈 없이 끝나면(손으로 고친 경우 등) 새 레코드가 앞줄에 붙어 버린다 → 줄바꿈 보충 */
+    if (t->end > 0) {
+        if (fseek(t->fp, -1, SEEK_END) == 0 && fgetc(t->fp) != '\n') {
+            fseek(t->fp, 0, SEEK_END);
+            fputc('\n', t->fp);
+            fflush(t->fp);
+            t->end++;
+        }
+    }
     return t;
 }
 
@@ -49,6 +59,10 @@ long table_append(table *t, const char *line) {
     /* 매번 fflush 하지 않는다: 100만 건이면 매번 디스크로 내보내는 비용이 너무 크다.
      * 줄은 버퍼에 모였다가, 꽉 차거나 / 다음 읽기 전 fseek / table_close 때 파일로 간다 */
     return offset;
+}
+
+int table_flush(table *t) {
+    return fflush(t->fp) == 0 ? 0 : -1;
 }
 
 int table_read_at(table *t, long offset, char *buf, int size) {

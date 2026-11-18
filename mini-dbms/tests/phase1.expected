@@ -1,0 +1,43 @@
+> INSERT INTO users VALUES ('kim', 31);
+INSERT 1 (id = 1)
+
+> INSERT INTO users VALUES ('lee', 25);
+INSERT 1 (id = 2)
+
+> INSERT INTO users VALUES ('park', 31);
+INSERT 1 (id = 3)
+
+> SELECT * FROM users;
+id | name | age
+1 | kim | 31
+2 | lee | 25
+3 | park | 31
+(3 rows)
+
+> SELECT * FROM users WHERE id = 2;
+id | name | age
+2 | lee | 25
+(1 rows)
+
+> SELECT * FROM users WHERE age = 31;
+id | name | age
+1 | kim | 31
+3 | park | 31
+(2 rows)
+
+> SELECT * FROM users WHERE name = 'nobody';
+id | name | age
+(0 rows)
+
+> INSERT INTO users VALUES ('kim');
+(error) 값 개수가 틀림 (id 빼고 2개 필요)
+
+> INSERT INTO users VALUES ('kim', 'x');
+(error) age 열: 정수 열에 정수가 아닌 값
+
+> SELECT name FROM users;
+(error) SELECT 다음에는 * (열 고르기는 지원 안 함)
+
+> SELECT * FROM orders;
+(error) 없는 테이블: orders
+

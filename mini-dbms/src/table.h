@@ -16,6 +16,9 @@ void table_close(table *t);
 long table_new_id(table *t);
 void table_set_next_id(table *t, long next_id);
 
+/* 버퍼에 모인 줄을 파일로 내보낸다. 성공 0, 실패 -1 */
+int table_flush(table *t);
+
 /* offset 바이트로 바로 가서 한 줄만 읽는다 (B+ 트리가 알려 준 위치). 성공 0, 실패 -1 */
 int table_read_at(table *t, long offset, char *buf, int size);
 

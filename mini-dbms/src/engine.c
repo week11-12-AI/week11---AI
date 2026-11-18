@@ -2,6 +2,7 @@
 #include "engine.h"
 
 #include <errno.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,6 +37,9 @@ static const schema SCHEMAS[] = {
 struct db {
     table *tables[NSCHEMAS];   /* SCHEMAS[i] 의 테이블 파일 (디스크) */
     bptree *index[NSCHEMAS];   /* SCHEMAS[i] 의 id 인덱스 (메모리): id → 파일 속 바이트 위치 */
+    pthread_mutex_t lock;      /* Phase 3: 엔진 전체를 한 번에 한 요청만 (파일 위치·트리·다음 id 공유) */
+    int sync;                  /* 1이면 INSERT 마다 flush */
+    int use_index;             /* 0이면 id 검색도 선형 탐색 */
 };
 
 /* ---------- 결과 글자를 이어 붙이는 도구 ---------- */
@@ -43,6 +47,7 @@ struct db {
 typedef struct {
     char *s;
     size_t len, cap;
+    int oom;        /* 메모리가 모자라 한 번이라도 못 붙였으면 1 (결과가 잘린 것) */
 } strbuf;
 
 static void sb_add(strbuf *b, const char *fmt, ...) {
@@ -50,12 +55,18 @@ static void sb_add(strbuf *b, const char *fmt, ...) {
     va_start(ap, fmt);
     int n = vsnprintf(NULL, 0, fmt, ap);
     va_end(ap);
-    if (n < 0) return;
+    if (n < 0 || b->oom) {
+        b->oom = 1;
+        return;
+    }
     if (b->len + (size_t)n + 1 > b->cap) {
         size_t cap = b->cap ? b->cap : 64;
         while (b->len + (size_t)n + 1 > cap) cap *= 2;
         char *s = realloc(b->s, cap);
-        if (s == NULL) return;
+        if (s == NULL) {
+            b->oom = 1;
+            return;
+        }
         b->s = s;
         b->cap = cap;
     }
@@ -107,7 +118,8 @@ static int is_integer(const char *text, long *out) {
 static const char *check_value(const column *c, const char *v) {
     long dummy;
     if (c->type == COL_INT && !is_integer(v, &dummy)) return "정수 열에 정수가 아닌 값";
-    if (c->type == COL_TEXT && strchr(v, ',') != NULL) return "글자 값에 쉼표(,)는 쓸 수 없음";
+    /* CSV 한 줄 = 레코드 하나라서, 칸을 나누는 쉼표와 줄을 나누는 줄바꿈은 값에 들어갈 수 없다 */
+    if (c->type == COL_TEXT && strpbrk(v, ",\r\n") != NULL) return "글자 값에 쉼표나 줄바꿈은 쓸 수 없음";
     return NULL;
 }
 
@@ -145,11 +157,18 @@ static char *exec_insert(db *d, const sql_stmt *st) {
     strbuf line = { 0 };
     sb_add(&line, "%ld", id);
     for (int i = 0; i < st->nvalues; i++) sb_add(&line, ",%s", st->values[i]);
-    if (line.s == NULL) return reply("(error) 메모리 부족");
+    if (line.oom) {
+        free(line.s);
+        table_set_next_id(t, id);   /* 실패한 INSERT 는 id 를 쓰지 않는다 */
+        return reply("(error) 메모리 부족");
+    }
 
     long offset = table_append(t, line.s);   /* ① 파일 끝에 붙이기 */
     free(line.s);
-    if (offset < 0) return reply("(error) 파일 쓰기 실패");
+    if (offset < 0 || (d->sync && table_flush(t) < 0)) {
+        table_set_next_id(t, id);
+        return reply("(error) 파일 쓰기 실패");
+    }
     if (bpt_insert(d->index[si], id, offset) < 0)   /* ② B+ 트리에 id → 위치 등록 */
         return reply("(error) 메모리 부족 (인덱스)");
     return reply("INSERT 1 (id = %ld)", id);
@@ -206,7 +225,7 @@ static char *exec_select(db *d, const sql_stmt *st) {
     for (int i = 0; i < c.s->ncols; i++) sb_add(&c.out, i ? " | %s" : "%s", c.s->cols[i].name);
     sb_add(&c.out, "\n");
 
-    if (c.where_col == 0) {
+    if (c.where_col == 0 && d->use_index) {
         /* 길 ①: WHERE id = ? → B+ 트리에서 위치를 찾아 그 한 줄만 읽는다 */
         long id = 0, offset = 0;
         char line[1024];
@@ -223,7 +242,11 @@ static char *exec_select(db *d, const sql_stmt *st) {
         return reply("(error) 파일 읽기 실패");
     }
     sb_add(&c.out, "(%ld rows)", c.count);
-    return c.out.s ? c.out.s : reply("(error) 메모리 부족");
+    if (c.out.oom) {
+        free(c.out.s);
+        return reply("(error) 메모리 부족 (결과가 너무 큼)");
+    }
+    return c.out.s;
 }
 
 /* ---------- 바깥 함수 ---------- */
@@ -237,7 +260,9 @@ typedef struct {
 
 static void rebuild_row(const char *line, long offset, void *arg) {
     rebuild_ctx *c = arg;
-    long id = strtol(line, NULL, 10);   /* 첫 칸이 id */
+    char *end;
+    long id = strtol(line, &end, 10);   /* 첫 칸이 id */
+    if (end == line || *end != ',' || id <= 0) return;   /* 망가진 줄은 인덱스에 넣지 않는다 */
     if (bpt_insert(c->index, id, offset) < 0) c->failed = 1;
     if (id > c->max_id) c->max_id = id;
 }
@@ -246,6 +271,8 @@ db *db_open(const char *dir) {
     if (mkdir(dir, 0755) != 0 && errno != EEXIST) return NULL;
     db *d = calloc(1, sizeof *d);
     if (d == NULL) return NULL;
+    pthread_mutex_init(&d->lock, NULL);
+    d->use_index = 1;
     for (int i = 0; i < NSCHEMAS; i++) {
         char path[512];
         snprintf(path, sizeof path, "%s/%s.csv", dir, SCHEMAS[i].name);
@@ -269,17 +296,29 @@ db *db_open(const char *dir) {
 void db_close(db *d) {
     if (d == NULL) return;
     for (int i = 0; i < NSCHEMAS; i++) {
-        table_close(d->tables[i]);
+        table_close(d->tables[i]);   /* 버퍼에 남은 줄도 이때 파일로 */
         bpt_free(d->index[i]);
     }
+    pthread_mutex_destroy(&d->lock);
     free(d);
+}
+
+void db_set_sync(db *d, int on) {
+    d->sync = on;
+}
+
+void db_set_use_index(db *d, int on) {
+    d->use_index = on;
 }
 
 char *db_execute(db *d, const char *sql) {
     sql_stmt st;
     char err[128];
-    if (sql_parse(sql, &st, err, sizeof err) < 0)   /* 1. 파서 */
+    if (sql_parse(sql, &st, err, sizeof err) < 0)   /* 1. 파서: 공유 데이터를 안 만지니 잠금 밖에서 */
         return reply("(error) %s", err);
-    if (st.kind == SQL_INSERT) return exec_insert(d, &st);   /* 2. 실행기 */
-    return exec_select(d, &st);
+
+    pthread_mutex_lock(&d->lock);                  /* 2. 실행기: 파일·트리·다음 id 를 만지니 잠금 안에서 */
+    char *r = st.kind == SQL_INSERT ? exec_insert(d, &st) : exec_select(d, &st);
+    pthread_mutex_unlock(&d->lock);
+    return r;
 }

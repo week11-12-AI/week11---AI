@@ -11,7 +11,15 @@ typedef struct db db;
 db *db_open(const char *dir);
 void db_close(db *d);
 
-/* 결과는 malloc 한 글자. 부른 쪽이 free 한다. 실패하면 "(error) ..." */
+/* 결과는 malloc 한 글자. 부른 쪽이 free 한다. 실패하면 "(error) ..."
+ * 여러 스레드가 동시에 불러도 된다: 안에서 엔진 전체를 잠금 하나로 감싼다 (Phase 3) */
 char *db_execute(db *d, const char *sql);
+
+/* 1이면 INSERT 마다 파일 버퍼를 바로 내보낸다 (서버용: 꺼져도 응답한 기록은 남게).
+ * 0(기본)이면 모아서 내보낸다 (100만 건 넣기용: 빠름) */
+void db_set_sync(db *d, int on);
+
+/* 0이면 WHERE id = ? 도 B+ 트리를 쓰지 않고 선형 탐색한다 (인덱스 사용/미사용 속도 비교용). 기본 1 */
+void db_set_use_index(db *d, int on);
 
 #endif
