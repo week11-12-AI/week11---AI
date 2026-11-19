@@ -23,6 +23,35 @@ Windows에서 `python` 명령을 찾지 못하면 `py server.py`를 사용하세
 
 HTML 파일을 직접 여는 대신 서버 주소로 접속하세요. 실행 ID는 서버가 HTML에 넣습니다.
 
+## DBMS Phase 1 → 2 → 3 연결
+
+```text
+브라우저 / PowerShell / curl 등 외부 클라이언트
+  → HTTP API
+  → Python ThreadPoolExecutor: HTTP 요청을 최대 4개 스레드에서 처리
+  → SQL 문자열 → 토큰 → 구조화된 AST
+  → 실행기: 컬럼·타입·ID 검증, 읽은 버전과 현재 버전 비교
+  → 쓰기: 잠금 → 변경 로그 기록 → fsync → 메모리 B+ 트리 반영
+  → 읽기: B+ 트리로 ID와 파일 위치 확인 → 저장 파일 읽기 → 응답
+  → 미니 React: useState → 새 VDOM → Diff → 바뀐 DOM만 Patch
+```
+
+| 단계 | 구현 내용 |
+| --- | --- |
+| Phase 1 | 직접 작성한 SQL 파서와 실행기, INSERT·SELECT·UPDATE·DELETE, 파일 영속 저장과 오류 처리 |
+| Phase 2 | 메모리 B+ 트리, 노드 분할·병합·재분배·연결 리프, 자동 ID, ID 인덱스 검색 |
+| Phase 3 | Python HTTP JSON API, ThreadPoolExecutor, 대기열 제한, 충돌 검증 및 쓰기 잠금 |
+
+SQLite나 기존 DBMS 라이브러리를 사용하지 않습니다. `products`와 `records` 두 테이블의 스키마를 Python 코드로 정의합니다. B+ 트리도 직접 구현했습니다.
+
+| 테이블 | 컬럼 |
+| --- | --- |
+| products | id: 양의 안전한 정수, name: 공백만 아닌 1~200자 문자열, price: 0 이상의 유한 숫자 |
+| records | id, puzzle_id, nickname: 1~20자, moves: 1~1,000, elapsed_ms: 0~86,400,000 또는 이전 기록의 NULL, created_at: ISO 시각 |
+
+INSERT에서 ID를 생략하면 자동 부여합니다. 명세의 예시처럼 `products.id=42`를 명시할 수도 있으며, 이후 자동 ID는 43부터입니다. 삭제한 ID는 자동 발급으로 재사용하지 않습니다. UPDATE로 ID를 바꿀 수 없습니다. DELETE는 행 자체를 제거하며 NULL로 채운 행을 남기지 않습니다.
+
+
 ## 미니 Redis 실행과 랭킹 캐시
 
 별도 터미널에서 `python -m mini_redis.server` 또는 `npm run redis`를 실행합니다. 기본 주소는 `http://127.0.0.1:4175`입니다. 기존 앱은 다른 터미널에서 `python server.py` 또는 `npm run dev`로 실행합니다.
@@ -113,34 +142,6 @@ Invoke-RestMethod "$base/api/kv/example" -Method Delete -ContentType 'applicatio
 - 성공 확인과 기록 저장은 도전 ID별로 재시도해도 한 번만 확정됩니다. 저장 실패는 재시도할 수 있습니다. 랭킹은 **이름별 최고 기록 하나**를 표시합니다. 이름 앞뒤 공백을 제거한 뒤 대소문자를 구분해 비교합니다. 기존 중복 기록은 조회 시 최고 기록을 골라 TOP 10을 구성합니다. 로그인·사용자 식별은 포함하지 않으므로 같은 이름을 쓰면 하나의 랭킹으로 취급합니다.
 - 도전 세션은 서버 실행 동안 최대 4,096개, 24시간 유지합니다. 서버 재시작 또는 세션 만료 후에는 새 도전을 시작해야 합니다. **이미 등록한 랭킹은 영구 저장**됩니다.
 - 이전 고정 배치의 기록도 보존합니다. 소요 시간이 없던 기록은 **시간 미측정**으로 표시하고, 이동 횟수가 같을 때는 시간이 측정된 기록 뒤에 배치합니다. 기존 로그 파일과 체크섬을 덮어쓰지 않습니다.
-
-## DBMS Phase 1 → 2 → 3 연결
-
-```text
-브라우저 / PowerShell / curl 등 외부 클라이언트
-  → HTTP API
-  → Python ThreadPoolExecutor: HTTP 요청을 최대 4개 스레드에서 처리
-  → SQL 문자열 → 토큰 → 구조화된 AST
-  → 실행기: 컬럼·타입·ID 검증, 읽은 버전과 현재 버전 비교
-  → 쓰기: 잠금 → 변경 로그 기록 → fsync → 메모리 B+ 트리 반영
-  → 읽기: B+ 트리로 ID와 파일 위치 확인 → 저장 파일 읽기 → 응답
-  → 미니 React: useState → 새 VDOM → Diff → 바뀐 DOM만 Patch
-```
-
-| 단계 | 구현 내용 |
-| --- | --- |
-| Phase 1 | 직접 작성한 SQL 파서와 실행기, INSERT·SELECT·UPDATE·DELETE, 파일 영속 저장과 오류 처리 |
-| Phase 2 | 메모리 B+ 트리, 노드 분할·병합·재분배·연결 리프, 자동 ID, ID 인덱스 검색 |
-| Phase 3 | Python HTTP JSON API, ThreadPoolExecutor, 대기열 제한, 충돌 검증 및 쓰기 잠금 |
-
-SQLite나 기존 DBMS 라이브러리를 사용하지 않습니다. `products`와 `records` 두 테이블의 스키마를 Python 코드로 정의합니다. B+ 트리도 직접 구현했습니다.
-
-| 테이블 | 컬럼 |
-| --- | --- |
-| products | id: 양의 안전한 정수, name: 공백만 아닌 1~200자 문자열, price: 0 이상의 유한 숫자 |
-| records | id, puzzle_id, nickname: 1~20자, moves: 1~1,000, elapsed_ms: 0~86,400,000 또는 이전 기록의 NULL, created_at: ISO 시각 |
-
-INSERT에서 ID를 생략하면 자동 부여합니다. 명세의 예시처럼 `products.id=42`를 명시할 수도 있으며, 이후 자동 ID는 43부터입니다. 삭제한 ID는 자동 발급으로 재사용하지 않습니다. UPDATE로 ID를 바꿀 수 없습니다. DELETE는 행 자체를 제거하며 NULL로 채운 행을 남기지 않습니다.
 
 ## SQL API 사용
 
